@@ -19,3 +19,16 @@ Walk me through a hypothetical example:
 "I want to add a new 'Modulo (%)' operator to the language."
 Show me exactly how our interaction would look using the prompts you just designed (Me sending the Scout Prompt -> You asking for specific files -> Me providing them -> You generating the solution).
 ## provide me an example how exactly in future i should make use of it so that in future following is possible:
+
+
+## after that done, could you provide QUICK REFERENCE GUIDE now for all files and dependencies in `*.md`?
+	with detailed categorized each script into 
+		0. File Overview
+		1. table columns
+			File	
+			Purpose	Size	
+			Complexity	
+			Modification Frequency
+		2. Dependency Graph of scripts
+		3. Execution Pipeline
+		4. and more  details as you seem fit
