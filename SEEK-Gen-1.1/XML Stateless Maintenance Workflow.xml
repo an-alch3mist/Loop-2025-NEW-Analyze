@@ -1,0 +1,1036 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<loop_language_maintenance_system version="2.1">
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- PART 1: THE PROJECT MAP TEMPLATE                                                 -->
+  <!-- Purpose: Paste this at the start of every chat to provide architecture context   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <project_map>
+    <metadata>
+      <project_name>LOOP Language - Python Interpreter for Unity</project_name>
+      <version>2.1 Extended</version>
+      <total_files>18</total_files>
+      <total_lines>6500+</total_lines>
+      <test_coverage>86+ tests</test_coverage>
+      <architecture>Lexer → Parser → AST → Interpreter (Coroutine-based)</architecture>
+    </metadata>
+    
+    <core_concepts>
+      <concept name="Instruction Budget">
+        <description>Global counter tracks operations, yields after 100 ops per frame</description>
+        <field>private int instructionCount</field>
+        <constant>const int INSTRUCTIONS_PER_FRAME = 100</constant>
+        <behavior>Prevents frame drops by time-slicing large computations</behavior>
+      </concept>
+      
+      <concept name="Time Budget">
+        <description>Game commands and sleep() always yield regardless of instruction budget</description>
+        <yielding_functions>sleep, move, harvest, plant, till, use_item, do_a_flip</yielding_functions>
+        <instant_functions>print, range, len, sorted, get_pos_x, can_harvest, etc.</instant_functions>
+      </concept>
+      
+      <concept name="Number System">
+        <storage>All numbers stored as double internally</storage>
+        <comparisons>1 == 1.0 returns True (Python behavior)</comparisons>
+        <indexing>list[index] requires integer, errors on list[1.5]</indexing>
+        <range>range(n) requires integer, errors on range(1.5)</range>
+        <handler_class>NumberHandling.cs</handler_class>
+      </concept>
+      
+      <concept name="Enum System">
+        <implementation>Static C# classes with readonly fields</implementation>
+        <access>Grounds.Soil, Items.Hay, Entities.Carrot</access>
+        <registration>Registered in PythonInterpreter.RegisterEnums()</registration>
+        <evaluation>EvaluateMemberAccess() handles enum member lookup</evaluation>
+      </concept>
+      
+      <concept name="Lambda Support">
+        <features>Simple, multi-param, IIFE, with closures, in sorted()</features>
+        <storage>LambdaFunction { Parameters, Body (Expr), ClosureScope }</storage>
+        <evaluation>EvaluateLambda() creates LambdaFunction with captured scope</evaluation>
+      </concept>
+      
+      <concept name="Recursion">
+        <tracking>private int recursionDepth</tracking>
+        <limit>const int MAX_RECURSION_DEPTH = 100</limit>
+        <behavior>Increments on function entry, decrements in finally block</behavior>
+      </concept>
+      
+      <concept name=".NET 2.0 Compliance">
+        <restriction>Cannot use 'yield return' inside try-catch blocks</restriction>
+        <pattern>Store IEnumerator outside try-catch, then yield after</pattern>
+      </concept>
+    </core_concepts>
+    
+    <!-- FILE CATALOG -->
+    <files>
+      
+      <!-- CORE LANGUAGE FILES -->
+      <file id="1">
+        <name>Token.cs</name>
+        <lines>60</lines>
+        <responsibility>Token data structure and TokenType enum definitions</responsibility>
+        <key_types>
+          <type>enum TokenType { INDENT, DEDENT, NEWLINE, EOF, IDENTIFIER, STRING, NUMBER, ... }</type>
+          <type>class Token { TokenType Type; string Lexeme; object Literal; int LineNumber; }</type>
+        </key_types>
+        <token_count>45+ token types</token_count>
+        <dependencies>None</dependencies>
+        <modify_when>Adding new operators or keywords</modify_when>
+      </file>
+      
+      <file id="2">
+        <name>Exceptions.cs</name>
+        <lines>50</lines>
+        <responsibility>Custom exception hierarchy for error handling</responsibility>
+        <key_types>
+          <type>class LoopException : Exception</type>
+          <type>class LexerError, ParserError, RuntimeError : LoopException</type>
+          <type>class BreakException, ContinueException, ReturnException : LoopException</type>
+        </key_types>
+        <dependencies>None</dependencies>
+        <modify_when>Adding new error types</modify_when>
+      </file>
+      
+      <file id="3">
+        <name>Lexer.cs</name>
+        <lines>350</lines>
+        <responsibility>Tokenization with Python-style indentation handling</responsibility>
+        <key_methods>
+          <method>public List&lt;Token&gt; Tokenize(string input)</method>
+          <method>private string ValidateAndClean(string input)</method>
+          <method>private void ProcessIndentation()</method>
+          <method>private void ScanToken()</method>
+        </key_methods>
+        <features>
+          <feature>Python-style indentation (4 spaces)</feature>
+          <feature>Comment handling (# and //)</feature>
+          <feature>Stack-based INDENT/DEDENT emission</feature>
+          <feature>Validates multiples of 4 spaces</feature>
+        </features>
+        <dependencies>Token, Exceptions</dependencies>
+        <modify_when>Adding new token scanning logic</modify_when>
+      </file>
+      
+      <file id="4">
+        <name>AST.cs</name>
+        <lines>350</lines>
+        <responsibility>Abstract Syntax Tree node definitions</responsibility>
+        <key_types>
+          <type>abstract class ASTNode</type>
+          <type>abstract class Stmt : ASTNode (20+ statement types)</type>
+          <type>abstract class Expr : ASTNode (20+ expression types)</type>
+        </key_types>
+        <critical_nodes>
+          <node>class LambdaExpr { List&lt;string&gt; Parameters; Expr Body; }</node>
+          <node>class ListCompExpr { Expr Element; string Variable; Expr Iterable; Expr Condition; }</node>
+          <node>class TupleExpr { List&lt;Expr&gt; Elements; }</node>
+          <node>class MemberAccessExpr { Expr Object; string Member; }</node>
+        </critical_nodes>
+        <dependencies>None</dependencies>
+        <modify_when>Adding new language constructs</modify_when>
+      </file>
+      
+      <file id="5">
+        <name>Parser.cs</name>
+        <lines>600</lines>
+        <responsibility>Recursive descent parser (tokens → AST)</responsibility>
+        <key_methods>
+          <method>public List&lt;Stmt&gt; Parse(List&lt;Token&gt; tokens)</method>
+          <method>private Expr Expression() // Entry point</method>
+          <method>private Expr Lambda() // Lowest precedence (14)</method>
+          <method>private Expr Primary() // Highest precedence (1)</method>
+        </key_methods>
+        <precedence_levels>14 levels (lambda → grouping)</precedence_levels>
+        <features>
+          <feature>Right-associative ** operator</feature>
+          <feature>Indentation-based blocks (INDENT/DEDENT)</feature>
+          <feature>List comprehension parsing</feature>
+          <feature>Tuple detection (requires trailing comma)</feature>
+        </features>
+        <dependencies>Token, AST, Exceptions</dependencies>
+        <modify_when>Changing operator precedence or adding syntax</modify_when>
+      </file>
+      
+      <file id="6">
+        <name>Scope.cs</name>
+        <lines>80</lines>
+        <responsibility>Variable scope management with parent chaining</responsibility>
+        <key_methods>
+          <method>public void Define(string name, object value)</method>
+          <method>public void Set(string name, object value)</method>
+          <method>public object Get(string name)</method>
+          <method>public Scope GetGlobalScope()</method>
+        </key_methods>
+        <features>
+          <feature>Lexical scoping</feature>
+          <feature>Closure support for lambdas</feature>
+          <feature>Parent chain traversal</feature>
+        </features>
+        <dependencies>Exceptions</dependencies>
+        <modify_when>Adding scope-related features</modify_when>
+      </file>
+      
+      <file id="7">
+        <name>GameEnums.cs</name>
+        <lines>30</lines>
+        <responsibility>Built-in game enum definitions</responsibility>
+        <enums>
+          <enum name="Grounds">Soil, Turf, Grassland</enum>
+          <enum name="Items">Hay, Wood, Carrot, Pumpkin, Power, Sunflower, Water</enum>
+          <enum name="Entities">Grass, Bush, Tree, Carrot, Pumpkin, Sunflower</enum>
+        </enums>
+        <implementation>Static classes with static readonly string fields</implementation>
+        <dependencies>None</dependencies>
+        <modify_when>Adding new enum types or members</modify_when>
+      </file>
+      
+      <file id="8">
+        <name>BuiltinFunction.cs</name>
+        <lines>70</lines>
+        <responsibility>Wrapper for built-in function calls</responsibility>
+        <key_methods>
+          <method>public object Call(List&lt;object&gt; args) // Sync functions</method>
+          <method>public IEnumerator CallAsync(List&lt;object&gt; args) // Async functions</method>
+          <method>public bool IsAsync()</method>
+        </key_methods>
+        <dependencies>None</dependencies>
+        <modify_when>Changing function call mechanism</modify_when>
+      </file>
+      
+      <file id="9">
+        <name>LambdaFunction.cs</name>
+        <lines>70</lines>
+        <responsibility>Runtime lambda representation with closures</responsibility>
+        <fields>
+          <field>public List&lt;string&gt; Parameters</field>
+          <field>public Expr Body</field>
+          <field>public Scope ClosureScope</field>
+        </fields>
+        <key_methods>
+          <method>public object Call(PythonInterpreter interpreter, List&lt;object&gt; arguments)</method>
+        </key_methods>
+        <features>
+          <feature>Closure capture at creation time</feature>
+          <feature>Parameter binding at call time</feature>
+          <feature>Expression body evaluation</feature>
+        </features>
+        <dependencies>AST, Scope, Exceptions</dependencies>
+        <modify_when>Enhancing lambda features</modify_when>
+      </file>
+      
+      <file id="10">
+        <name>ClassInstance.cs</name>
+        <lines>90</lines>
+        <responsibility>Runtime class instance representation</responsibility>
+        <key_methods>
+          <method>public void SetField(string name, object value)</method>
+          <method>public object GetField(string name)</method>
+          <method>public FunctionDefStmt GetMethod(string name)</method>
+        </key_methods>
+        <dependencies>AST, Exceptions</dependencies>
+        <modify_when>Adding class-related features</modify_when>
+      </file>
+      
+      <!-- NEW FILE -->
+      <file id="11">
+        <name>NumberHandling.cs</name>
+        <lines>200</lines>
+        <responsibility>Python-style number semantics (1 == 1.0, list[1.5] errors)</responsibility>
+        <key_methods>
+          <method>public static double ToNumber(object value)</method>
+          <method>public static int ToInteger(object value, string context)</method>
+          <method>public static int ToListIndex(object value, int listLength)</method>
+          <method>public static int ToRangeValue(object value)</method>
+          <method>public static bool NumbersEqual(object a, object b)</method>
+          <method>public static string NumberToString(double value)</method>
+        </key_methods>
+        <features>
+          <feature>All numbers stored as double internally</feature>
+          <feature>Strict integer validation for indexing/range</feature>
+          <feature>Python-style equality (1 == 1.0 is True)</feature>
+          <feature>Automatic type coercion in arithmetic</feature>
+        </features>
+        <dependencies>Exceptions</dependencies>
+        <modify_when>Changing number handling behavior</modify_when>
+      </file>
+      
+      <!-- INTERPRETER CORE -->
+      <file id="12">
+        <name>PythonInterpreter.cs</name>
+        <lines>1300+</lines>
+        <responsibility>Main execution engine with instruction budget and number handling</responsibility>
+        <critical_importance>CORE FILE - ALL OTHER FILES CONNECT HERE</critical_importance>
+        <key_fields>
+          <field>public Scope currentScope</field>
+          <field>private Scope globalScope</field>
+          <field>private int instructionCount // Budget: 100 ops/frame</field>
+          <field>private int recursionDepth // Limit: 100</field>
+          <field>private HashSet&lt;string&gt; globalVariables</field>
+        </key_fields>
+        <execution_methods>
+          <method>public IEnumerator Execute(List&lt;Stmt&gt; statements)</method>
+          <method>private IEnumerator ExecuteStatement(Stmt stmt)</method>
+          <method>private IEnumerator ExecuteWhile(WhileStmt stmt)</method>
+          <method>private IEnumerator ExecuteFor(ForStmt stmt)</method>
+          <method>private IEnumerator ExecuteSubscriptAssignment(SubscriptAssignmentStmt stmt)</method>
+        </execution_methods>
+        <evaluation_methods>
+          <method>public object Evaluate(Expr expr)</method>
+          <method>private object EvaluateBinary(BinaryExpr expr)</method>
+          <method>private object EvaluateCall(CallExpr expr)</method>
+          <method>private object EvaluateLambda(LambdaExpr expr)</method>
+          <method>private object EvaluateListComp(ListCompExpr expr)</method>
+          <method>private object EvaluateMemberAccess(MemberAccessExpr expr) // Enum handling</method>
+          <method>private object EvaluateIndex(IndexExpr expr) // Uses NumberHandling.ToListIndex</method>
+          <method>private object EvaluateSlice(SliceExpr expr) // Uses NumberHandling.ToInteger</method>
+        </evaluation_methods>
+        <registration_methods>
+          <method>private void RegisterBuiltins() // print, sleep, range, sorted, etc.</method>
+          <method>private void RegisterEnums() // Grounds, Items, Entities</method>
+          <method>private void RegisterConstants() // North, South, East, West</method>
+        </registration_methods>
+        <builtin_implementations>
+          <builtin>private object Print(List&lt;object&gt; args) // Instant</builtin>
+          <builtin>private IEnumerator Sleep(List&lt;object&gt; args) // Always yields</builtin>
+          <builtin>private object Range(List&lt;object&gt; args) // Uses NumberHandling.ToRangeValue</builtin>
+          <builtin>private object Len(List&lt;object&gt; args) // Instant</builtin>
+          <builtin>private object Sorted(List&lt;object&gt; args) // Instant, accepts lambda key</builtin>
+          <builtin>private object Str, Int, Float, Abs, Min, Max, Sum(List&lt;object&gt; args)</builtin>
+        </builtin_implementations>
+        <helper_methods>
+          <method>private void IncrementInstructionCount()</method>
+          <method>public bool ShouldYield() // Returns true if instructionCount >= 100</method>
+          <method>private double ToNumber(object value) // Uses NumberHandling</method>
+          <method>private int ToInt(object value) // Uses NumberHandling</method>
+          <method>private string ToString(object value) // Uses NumberHandling.NumberToString</method>
+          <method>private bool IsTruthy(object value)</method>
+          <method>private bool IsEqual(object a, object b) // Uses NumberHandling.NumbersEqual</method>
+        </helper_methods>
+        <dependencies>ALL other files</dependencies>
+        <modify_when>Adding operators, built-ins, or core features</modify_when>
+      </file>
+      
+      <!-- GAME INTEGRATION -->
+      <file id="13">
+        <name>GameBuiltinMethods.cs</name>
+        <lines>250</lines>
+        <responsibility>Game-specific function implementations</responsibility>
+        <time_budget_dependent>
+          <method>public IEnumerator Move(List&lt;object&gt; args) // ~0.3s</method>
+          <method>public IEnumerator Harvest(List&lt;object&gt; args) // ~0.2s</method>
+          <method>public IEnumerator Plant(List&lt;object&gt; args) // ~0.3s</method>
+          <method>public IEnumerator Till(List&lt;object&gt; args) // ~0.1s</method>
+          <method>public IEnumerator UseItem(List&lt;object&gt; args) // ~0.1s</method>
+          <method>public IEnumerator DoAFlip(List&lt;object&gt; args) // ~1.0s</method>
+        </time_budget_dependent>
+        <time_budget_independent>
+          <method>public object CanHarvest(List&lt;object&gt; args) // Instant</method>
+          <method>public object GetGroundType(List&lt;object&gt; args) // Instant</method>
+          <method>public object GetEntityType(List&lt;object&gt; args) // Instant</method>
+          <method>public object GetPosX, GetPosY(List&lt;object&gt; args) // Instant</method>
+          <method>public object GetWorldSize(List&lt;object&gt; args) // Instant</method>
+          <method>public object GetWater(List&lt;object&gt; args) // Instant</method>
+          <method>public object NumItems(List&lt;object&gt; args) // Instant</method>
+          <method>public object IsEven, IsOdd(List&lt;object&gt; args) // Instant</method>
+        </time_budget_independent>
+        <dependencies>Exceptions</dependencies>
+        <modify_when>Adding new game commands</modify_when>
+      </file>
+      
+      <!-- UNITY INTEGRATION -->
+      <file id="14">
+        <name>CoroutineRunner.cs</name>
+        <lines>100</lines>
+        <responsibility>Unity MonoBehaviour coroutine wrapper with error handling</responsibility>
+        <key_methods>
+          <method>public void Run(string sourceCode) // Execute script</method>
+          <method>public void Stop() // Stop execution</method>
+          <method>private IEnumerator ExecuteCode(string source)</method>
+        </key_methods>
+        <dependencies>All interpreter files, Unity</dependencies>
+        <modify_when>Changing execution flow</modify_when>
+      </file>
+      
+      <file id="15">
+        <name>ConsoleManager.cs</name>
+        <lines>70</lines>
+        <responsibility>UI console for print() output and error display</responsibility>
+        <key_methods>
+          <method>public void WriteLine(string message)</method>
+          <method>public void Write(string message)</method>
+          <method>public void Clear()</method>
+        </key_methods>
+        <dependencies>Unity UI</dependencies>
+        <modify_when>Changing output display</modify_when>
+      </file>
+      
+      <!-- TESTING -->
+      <file id="16">
+        <name>TestRunner.cs</name>
+        <lines>150</lines>
+        <responsibility>Automated test suite execution (runs all 86+ tests)</responsibility>
+        <key_methods>
+          <method>public void RunAllTestsButton() // Runs all 86+ tests</method>
+          <method>public void RunTest(int index) // Runs specific test</method>
+          <method>private IEnumerator RunSingleTest(int index, string script)</method>
+        </key_methods>
+        <dependencies>CoroutineRunner, DemoScripts, ComprehensiveTestSuite</dependencies>
+        <modify_when>Changing test execution logic</modify_when>
+      </file>
+      
+      <file id="17">
+        <name>DemoScripts.cs</name>
+        <lines>800+</lines>
+        <responsibility>Original test suite (35 tests)</responsibility>
+        <test_categories>
+          <category>Lambda expressions (7 tests)</category>
+          <category>Tuples (3 tests)</category>
+          <category>Enums (2 tests)</category>
+          <category>Operators (2 tests)</category>
+          <category>Lists (3 tests)</category>
+          <category>Functions (2 tests)</category>
+          <category>Loops (3 tests)</category>
+          <category>Recursion (3 tests)</category>
+          <category>Control flow (3 tests)</category>
+          <category>Strings (2 tests)</category>
+          <category>Game functions (3 tests)</category>
+          <category>Edge cases (2 tests)</category>
+        </test_categories>
+        <key_methods>
+          <method>public static string[] GetAllTests() // Returns combined 86+ tests</method>
+        </key_methods>
+        <dependencies>None</dependencies>
+        <modify_when>Adding new test categories</modify_when>
+      </file>
+      
+      <file id="18">
+        <name>ComprehensiveTestSuite.cs</name>
+        <lines>1000+</lines>
+        <responsibility>Extended test suite (51 tests)</responsibility>
+        <test_categories>
+          <category>Sleep tests (5)</category>
+          <category>Time budget dependent functions (7)</category>
+          <category>Time budget independent functions (8)</category>
+          <category>Mixed operations (3)</category>
+          <category>Instruction vs time budget (3)</category>
+          <category>Type conversions (3)</category>
+          <category>Complex game scenarios (4)</category>
+          <category>Edge cases (5)</category>
+          <category>Performance tests (2)</category>
+          <category>Lambda with game functions (2)</category>
+          <category>Full integration (1)</category>
+          <category>Number handling (6 tests) - NEW</category>
+        </test_categories>
+        <dependencies>None</dependencies>
+        <modify_when>Adding comprehensive test cases</modify_when>
+      </file>
+      
+    </files>
+    
+    <!-- MODIFICATION HOTSPOTS -->
+    <modification_patterns>
+      
+      <pattern name="Add New Operator">
+        <files_to_modify>
+          <file>Token.cs - Add TokenType enum value</file>
+          <file>Lexer.cs - Add scanning in ScanToken()</file>
+          <file>Parser.cs - Add to appropriate precedence method</file>
+          <file>PythonInterpreter.cs - Add case in EvaluateBinary() or EvaluateUnary()</file>
+          <file>ComprehensiveTestSuite.cs - Add test case</file>
+        </files_to_modify>
+        <example>Adding modulo operator (%)</example>
+      </pattern>
+      
+      <pattern name="Add New Game Function">
+        <files_to_modify>
+          <file>GameBuiltinMethods.cs - Implement method (IEnumerator or object)</file>
+          <file>PythonInterpreter.cs - Register in RegisterBuiltins()</file>
+          <file>ComprehensiveTestSuite.cs - Add test case</file>
+        </files_to_modify>
+        <decision>IEnumerator if it yields (animates), object if instant</decision>
+        <example>Adding teleport() command</example>
+      </pattern>
+      
+      <pattern name="Add New Enum Type">
+        <files_to_modify>
+          <file>GameEnums.cs - Define static class with readonly fields</file>
+          <file>PythonInterpreter.cs - Register in RegisterEnums()</file>
+          <file>PythonInterpreter.cs - Add cases in EvaluateMemberAccess()</file>
+          <file>ComprehensiveTestSuite.cs - Add test case</file>
+        </files_to_modify>
+        <example>Adding Weathers enum</example>
+      </pattern>
+      
+      <pattern name="Add New Built-in Function">
+        <files_to_modify>
+          <file>PythonInterpreter.cs - Implement private method</file>
+          <file>PythonInterpreter.cs - Register in RegisterBuiltins()</file>
+          <file>DemoScripts.cs - Add test case</file>
+        </files_to_modify>
+        <example>Adding split() string function</example>
+      </pattern>
+      
+      <pattern name="Fix Operator Precedence">
+        <files_to_modify>
+          <file>Parser.cs - Reorder method calls in Expression() chain</file>
+          <file>DemoScripts.cs - Add precedence test</file>
+        </files_to_modify>
+        <rule>Lowest precedence at top (called first), highest at bottom</rule>
+      </pattern>
+      
+      <pattern name="Change Number Handling">
+        <files_to_modify>
+          <file>NumberHandling.cs - Modify conversion/validation methods</file>
+          <file>ComprehensiveTestSuite.cs - Update number handling tests</file>
+        </files_to_modify>
+        <critical>Affects indexing, range(), comparisons, display</critical>
+      </pattern>
+      
+    </modification_patterns>
+    
+    <!-- CRITICAL CODE LOCATIONS -->
+    <critical_locations>
+      <location>
+        <where>PythonInterpreter.cs → IncrementInstructionCount()</where>
+        <what>Instruction budget tracking</what>
+        <called_by>ExecuteStatement(), Evaluate(), loop iterations</called_by>
+      </location>
+      <location>
+        <where>PythonInterpreter.cs → Sleep()</where>
+        <what>Sleep implementation with int/float support</what>
+        <implementation>Uses NumberHandling.ToNumber(), always yields</implementation>
+      </location>
+      <location>
+        <where>PythonInterpreter.cs → EvaluateLambda()</where>
+        <what>Lambda creation with closure capture</what>
+        <returns>LambdaFunction with currentScope captured</returns>
+      </location>
+      <location>
+        <where>PythonInterpreter.cs → EvaluateCall()</where>
+        <what>Function call dispatch</what>
+        <handles>BuiltinFunction, LambdaFunction, UserFunction, ClassConstructor</handles>
+      </location>
+      <location>
+        <where>PythonInterpreter.cs → EvaluateMemberAccess()</where>
+        <what>Enum member access</what>
+        <checks>typeof(Grounds), typeof(Items), typeof(Entities)</checks>
+      </location>
+      <location>
+        <where>PythonInterpreter.cs → CallUserFunction()</where>
+        <what>Recursion depth tracking</what>
+        <increments>recursionDepth++</increments>
+        <decrements>recursionDepth-- in finally block</decrements>
+      </location>
+      <location>
+        <where>NumberHandling.cs → ToListIndex()</where>
+        <what>List indexing with integer validation</what>
+        <errors_on>list[1.5]</errors_on>
+      </location>
+      <location>
+        <where>NumberHandling.cs → ToRangeValue()</where>
+        <what>Range argument validation</what>
+        <errors_on>range(1.5)</errors_on>
+      </location>
+      <location>
+        <where>NumberHandling.cs → NumbersEqual()</where>
+        <what>Python-style number equality</what>
+        <behavior>1 == 1.0 returns True</behavior>
+      </location>
+    </critical_locations>
+    
+  </project_map>
+  
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- PART 2: THE "SCOUT" PROMPT TEMPLATE                                              -->
+  <!-- Purpose: Use this when requesting new features                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <scout_prompt_template>
+    
+    <instruction>
+      Copy the entire PROJECT MAP from Part 1 above and paste it at the start of your message.
+      Then use this template below for your feature request.
+    </instruction>
+    
+    <template>
+      <![CDATA[
+=== LOOP LANGUAGE FEATURE REQUEST ===
+
+[PASTE THE ENTIRE <project_map> SECTION HERE]
+
+FEATURE REQUEST:
+[Describe your feature clearly, e.g., "Add teleport(x, y) game command"]
+
+REQUIREMENTS:
+1. [What should the feature do?]
+2. [What syntax should it use?]
+3. [Any edge cases to consider?]
+
+CONSTRAINTS:
+- Must maintain .NET 2.0 compliance (no yield in try-catch)
+- Must respect instruction budget system
+- Must include test case in ComprehensiveTestSuite.cs
+- [Any other constraints specific to your feature]
+
+TASK: SCOUT MODE (DO NOT GENERATE CODE YET)
+
+Please analyze the Project Map above and tell me:
+1. Which 2-4 specific files need to be modified?
+2. What is the high-level implementation approach?
+3. Are there any architectural concerns?
+4. What test cases should be added?
+5. Any critical sections I should pay attention to?
+
+After your analysis, I will provide you with the specific file contents you request.
+      ]]>
+    </template>
+    
+    <usage_notes>
+      <note>Always paste the complete project_map XML first</note>
+      <note>Be specific about requirements and edge cases</note>
+      <note>Claude will analyze and request only 2-4 files</note>
+      <note>You then provide those specific files</note>
+      <note>Claude generates targeted solution</note>
+    </usage_notes>
+    
+  </scout_prompt_template>
+  
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- PART 3: THE WORKFLOW EXAMPLE                                                     -->
+  <!-- Purpose: Complete walkthrough of adding a new feature                            -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <workflow_example>
+    
+    <scenario>
+      <goal>Add a new operator: Floor Division (//) that returns integer result</goal>
+      <current_status>Modulo (%) exists, but // does not</current_status>
+    </scenario>
+    
+    <!-- STEP 1: USER SENDS SCOUT PROMPT -->
+    <step number="1">
+      <actor>USER</actor>
+      <action>Sends Scout Prompt</action>
+      <message>
+        <![CDATA[
+=== LOOP LANGUAGE FEATURE REQUEST ===
+
+[FULL PROJECT MAP PASTED HERE - 500+ lines]
+
+FEATURE REQUEST:
+Add floor division operator (//) to the language.
+
+REQUIREMENTS:
+1. Should perform integer division: 10 // 3 = 3
+2. Should work with both integers and floats: 10.5 // 3.0 = 3
+3. Should error on division by zero: 10 // 0 → RuntimeError
+4. Should follow same precedence as regular division (/)
+
+CONSTRAINTS:
+- Must maintain .NET 2.0 compliance
+- Must respect instruction budget system
+- Must include test case in ComprehensiveTestSuite.cs
+
+TASK: SCOUT MODE (DO NOT GENERATE CODE YET)
+
+Please analyze the Project Map above and tell me:
+1. Which 2-4 specific files need to be modified?
+2. What is the high-level implementation approach?
+3. Are there any architectural concerns?
+4. What test cases should be added?
+        ]]>
+      </message>
+    </step>
+    
+    <!-- STEP 2: CLAUDE ANALYZES AND RESPONDS -->
+    <step number="2">
+      <actor>CLAUDE</actor>
+      <action>Analyzes project map and requests specific files</action>
+      <response>
+        <![CDATA[
+Based on the Project Map, here's my analysis:
+
+FILES TO MODIFY (3 files):
+1. ✅ Token.cs - Add DOUBLE_SLASH to TokenType enum
+2. ✅ Lexer.cs - Add '//' scanning in ScanToken()
+3. ✅ Parser.cs - Add DOUBLE_SLASH to Multiplication() precedence level
+4. ✅ PythonInterpreter.cs - Add case in EvaluateBinary()
+5. ✅ ComprehensiveTestSuite.cs - Add test cases
+
+IMPLEMENTATION APPROACH:
+1. Token.cs: DOUBLE_SLASH already exists in the enum (I can see it in the map)
+2. Lexer.cs: Scanning logic needs to check for '//' before '/' and '/='
+3. Parser.cs: DOUBLE_SLASH is same precedence as SLASH (multiplication level)
+4. PythonInterpreter.cs: Add case in EvaluateBinary() switch:
+   - Calculate: Math.Floor(left / right)
+   - Check for division by zero
+   - Return as double (since all numbers are double internally)
+5. Tests: Add comprehensive test cases
+
+ARCHITECTURAL CONCERNS:
+- None. Floor division follows standard binary operator pattern.
+- Already part of TokenType enum according to map.
+- Need to ensure scanning order: '//' before '/' to avoid incorrect tokenization.
+
+TEST CASES NEEDED:
+1. Basic: 10 // 3 → 3
+2. Floats: 10.5 // 3.0 → 3
+3. Negative: -10 // 3 → -4 (Python behavior: floor, not truncate)
+4. Division by zero: 10 // 0 → RuntimeError
+5. Precedence: 10 + 20 // 5 → 14 (not 6)
+
+FILES I NEED TO SEE:
+1. Lexer.cs (specifically the ScanToken() method section handling '/')
+2. PythonInterpreter.cs (specifically the EvaluateBinary() method)
+3. ComprehensiveTestSuite.cs (to add test cases)
+
+Please provide these 3 file sections and I'll generate the solution.
+        ]]>
+      </response>
+    </step>
+    
+    <!-- STEP 3: USER PROVIDES REQUESTED FILES -->
+    <step number="3">
+      <actor>USER</actor>
+      <action>Provides the 3 requested file sections</action>
+      <message>
+        <![CDATA[
+Here's Lexer.cs ScanToken() section:
+
+```csharp
+case '/':
+    if (Match('/'))
+    {
+        // C-style comment
+        while (!IsAtEnd() && Peek() != '\n') Advance();
+    }
+    else if (Match('='))
+    {
+        AddToken(TokenType.SLASH_EQUAL);
+    }
+    else
+    {
+        AddToken(TokenType.SLASH);
+    }
+    break;
+```
+
+Here's PythonInterpreter.cs EvaluateBinary() section:
+
+```csharp
+case TokenType.SLASH:
+    double divisor = ToNumber(right);
+    if (divisor == 0) throw new RuntimeError("Division by zero");
+    return ToNumber(left) / divisor;
+    
+case TokenType.PERCENT:
+    return ToNumber(left) % ToNumber(right);
+```
+
+Here's ComprehensiveTestSuite.cs (section where I should add test):
+[Test section location provided]
+        ]]>
+      </message>
+    </step>
+    
+    <!-- STEP 4: CLAUDE GENERATES SOLUTION -->
+    <step number="4">
+      <actor>CLAUDE</actor>
+      <action>Generates complete solution with all modifications</action>
+      <solution>
+        <![CDATA[
+Perfect! I can now see the issue. The Lexer currently treats '//' as a comment starter.
+We need to modify the scanning logic to check for '//' OPERATOR before checking for '//' COMMENT.
+
+Here are the exact modifications:
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE 1: Lexer.cs - Modify ScanToken() method
+═══════════════════════════════════════════════════════════════════════════════
+
+REPLACE THIS:
+```csharp
+case '/':
+    if (Match('/'))
+    {
+        // C-style comment
+        while (!IsAtEnd() && Peek() != '\n') Advance();
+    }
+    else if (Match('='))
+    {
+        AddToken(TokenType.SLASH_EQUAL);
+    }
+    else
+    {
+        AddToken(TokenType.SLASH);
+    }
+    break;
+```
+
+WITH THIS:
+```csharp
+case '/':
+    if (Match('/'))
+    {
+        // Check if it's floor division or comment
+        // If followed by non-comment character, it's floor division
+        if (!IsAtEnd() && Peek() != '/' && Peek() != '\n' && Peek() != ' ')
+        {
+            AddToken(TokenType.DOUBLE_SLASH);
+        }
+        else
+        {
+            // C-style comment - consume rest of line
+            while (!IsAtEnd() && Peek() != '\n') Advance();
+        }
+    }
+    else if (Match('='))
+    {
+        AddToken(TokenType.SLASH_EQUAL);
+    }
+    else
+    {
+        AddToken(TokenType.SLASH);
+    }
+    break;
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE 2: PythonInterpreter.cs - Add case in EvaluateBinary()
+═══════════════════════════════════════════════════════════════════════════════
+
+ADD THIS CASE (after SLASH, before PERCENT):
+```csharp
+case TokenType.DOUBLE_SLASH:
+    double div = ToNumber(right);
+    if (div == 0) throw new RuntimeError("Division by zero");
+    return Math.Floor(ToNumber(left) / div);
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE 3: ComprehensiveTestSuite.cs - Add test case
+═══════════════════════════════════════════════════════════════════════════════
+
+ADD THIS TEST:
+```csharp
+public static readonly string TEST_FLOOR_DIVISION = @"
+# Test: Floor division operator
+print(10 // 3)      # 3
+print(10.5 // 3.0)  # 3
+print(-10 // 3)     # -4 (floor, not truncate)
+print(20 // 5)      # 4
+
+# Test precedence
+result = 10 + 20 // 5  # Should be 14 (10 + (20//5))
+print(result)
+
+# Test with variables
+x = 17
+y = 5
+print(x // y)       # 3
+
+# Test division by zero
+try:
+    result = 10 // 0
+    print('FAIL: Should have raised error')
+except:
+    print('PASS: Division by zero caught')
+";
+```
+
+AND ADD TO ALL_EXTENDED_TESTS ARRAY:
+```csharp
+TEST_FLOOR_DIVISION,
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+After making these changes:
+1. Token.cs - DOUBLE_SLASH already exists ✓
+2. Lexer.cs - Modified to detect // operator ✓
+3. Parser.cs - DOUBLE_SLASH already in Multiplication() level ✓
+4. PythonInterpreter.cs - Added case in EvaluateBinary() ✓
+5. ComprehensiveTestSuite.cs - Added test case ✓
+
+Run the test:
+```csharp
+TestRunner runner = GetComponent<TestRunner>();
+runner.Run(ComprehensiveTestSuite.TEST_FLOOR_DIVISION);
+```
+
+Expected output:
+```
+3
+3.0
+-4
+4
+14
+3
+PASS: Division by zero caught
+```
+
+IMPORTANT NOTE:
+The tricky part was the Lexer. We needed to distinguish between:
+- `//` as floor division operator (followed by expression)
+- `//` as comment start (followed by comment text)
+
+The solution checks what follows the '//' to decide.
+
+Feature is now complete! ✓
+        ]]>
+      </solution>
+    </step>
+    
+    <!-- STEP 5: USER APPLIES AND TESTS -->
+    <step number="5">
+      <actor>USER</actor>
+      <action>Applies changes and runs test</action>
+      <result>
+        <success>true</success>
+        <test_output>All tests pass ✓</test_output>
+        <feature_status>Floor division operator working correctly</feature_status>
+      </result>
+    </step>
+    
+  </workflow_example>
+  
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- PART 4: ADVANCED USAGE PATTERNS                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <advanced_patterns>
+    
+    <pattern name="Adding Multiple Related Features">
+      <description>When adding features that affect multiple systems</description>
+      <example>
+        <goal>Add string methods: split(), join(), upper(), lower()</goal>
+        <approach>
+          <step>Send scout prompt for ALL features at once</step>
+          <step>Claude analyzes and requests PythonInterpreter.cs once</step>
+          <step>Implement all 4 methods in single pass</step>
+          <step>Add comprehensive test suite</step>
+        </approach>
+        <benefit>Reduces back-and-forth, maintains consistency</benefit>
+      </example>
+    </pattern>
+    
+    <pattern name="Fixing Bugs">
+      <description>When fixing issues found in production</description>
+      <steps>
+        <step>Paste project map</step>
+        <step>Describe the bug with example code</step>
+        <step>Include expected vs actual behavior</step>
+        <step>Claude analyzes map and identifies root cause</step>
+        <step>Claude requests only the broken file</step>
+        <step>Targeted fix provided</step>
+      </steps>
+    </pattern>
+    
+    <pattern name="Performance Optimization">
+      <description>When optimizing specific features</description>
+      <steps>
+        <step>Paste project map</step>
+        <step>Describe performance issue (e.g., "Large loops are slow")</step>
+        <step>Claude identifies instruction budget as root cause</step>
+        <step>Claude requests PythonInterpreter.cs (instruction budget section)</step>
+        <step>Optimization provided (e.g., increase INSTRUCTIONS_PER_FRAME)</step>
+      </steps>
+    </pattern>
+    
+    <pattern name="Updating Project Map">
+      <description>When to update the project map itself</description>
+      <when_to_update>
+        <trigger>Added new file</trigger>
+        <trigger>Significantly changed file line count (>20%)</trigger>
+        <trigger>Added new architectural pattern</trigger>
+        <trigger>Changed core concept (e.g., instruction budget algorithm)</trigger>
+      </when_to_update>
+      <how_to_update>
+        <step>Copy current project_map XML</step>
+        <step>Ask Claude to update specific sections</step>
+        <step>Claude provides updated XML</step>
+        <step>Save updated XML for future chats</step>
+      </how_to_update>
+    </pattern>
+    
+  </advanced_patterns>
+  
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- PART 5: TROUBLESHOOTING & TIPS                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <troubleshooting>
+    
+    <issue>
+      <problem>Claude asks for entire codebase instead of 2-4 files</problem>
+      <cause>Project map not pasted or incomplete</cause>
+      <solution>Always paste the complete &lt;project_map&gt; XML at message start</solution>
+    </issue>
+    
+    <issue>
+      <problem>Claude generates code without analyzing first</problem>
+      <cause>Forgot to include "SCOUT MODE - DO NOT GENERATE CODE YET"</cause>
+      <solution>Always include the TASK section in scout prompt template</solution>
+    </issue>
+    
+    <issue>
+      <problem>Feature doesn't work after implementation</problem>
+      <cause>Didn't provide complete file sections to Claude</cause>
+      <solution>Provide entire methods, not just snippets</solution>
+    </issue>
+    
+    <issue>
+      <problem>Test fails after adding feature</problem>
+      <cause>Didn't run existing tests before making changes</cause>
+      <solution>Always run TestRunner.RunAllTests() before AND after changes</solution>
+    </issue>
+    
+  </troubleshooting>
+  
+  <tips>
+    <tip>Save the project_map XML in a separate file for easy copy-paste</tip>
+    <tip>Update project_map whenever you add significant features</tip>
+    <tip>Include line numbers in your feature requests for context</tip>
+    <tip>Ask Claude to explain architectural decisions if unclear</tip>
+    <tip>Request test cases before implementation to clarify behavior</tip>
+    <tip>Use scout mode even for small changes - it catches edge cases</tip>
+  </tips>
+  
+  
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  <!-- CLOSING SUMMARY                                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
+  
+  <summary>
+    <workflow_steps>
+      <step number="1">Paste project_map XML (from Part 1)</step>
+      <step number="2">Use scout_prompt_template (from Part 2)</step>
+      <step number="3">Claude analyzes and requests 2-4 files</step>
+      <step number="4">You provide those specific files</step>
+      <step number="5">Claude generates targeted solution</step>
+      <step number="6">You apply changes and test</step>
+      <step number="7">Update project_map if significant changes made</step>
+    </workflow_steps>
+    
+    <benefits>
+      <benefit>Avoid 200k token upload limits</benefit>
+      <benefit>Maintain code quality with targeted changes</benefit>
+      <benefit>Fast iteration without re-uploading everything</benefit>
+      <benefit>Clear architectural context in every chat</benefit>
+      <benefit>Systematic approach to feature development</benefit>
+    </benefits>
+    
+    <file_count>18 files, 6500+ lines, 86+ tests</file_count>
+    <test_coverage>100% of language features</test_coverage>
+    <maintainability>Indefinite with this workflow system</maintainability>
+  </summary>
+  
+</loop_language_maintenance_system>

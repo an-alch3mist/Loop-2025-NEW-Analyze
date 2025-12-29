@@ -1,0 +1,360 @@
+========================================
+STARTING COMPREHENSIVE TEST SUITE
+Total tests: 86
+(35 original + 45 extended tests)
+========================================
+
+[TEST 1] Running: Lambda with list comprehension inside
+[TEST 1] ✗ FAILED: Lambda with list comprehension inside
+Error: Parse error at line 4: Expected 'else' in conditional expression at line 4, got ']'
+
+[TEST 2] Running: Sorted with lambda accessing tuple elements
+[TEST 2] ✗ FAILED: Sorted with lambda accessing tuple elements
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 3] Running: Lambda with multiple conditions
+[TEST 3] ✗ FAILED: Lambda with multiple conditions
+Error: Parse error at line 5: Expected 'else' in conditional expression at line 5, got ')'
+
+[TEST 4] Running: Immediately invoked lambda expression (IIFE)
+[TEST 4] ✗ FAILED: Immediately invoked lambda expression (IIFE)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 5] Running: Lambda with nested indexing
+[TEST 5] ✗ FAILED: Lambda with nested indexing
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 6] Running: Lambda with multiple parameters
+[TEST 6] ✗ FAILED: Lambda with multiple parameters
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 7] Running: Tuple creation and indexing
+[TEST 7] ✗ FAILED: Tuple creation and indexing
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 8] Running: Tuple in list, iteration
+[TEST 8] ✗ FAILED: Tuple in list, iteration
+Error: Parse error at line 5: Parse error at line 5: Expected newline at line 5
+
+[TEST 9] Running: Single element tuple
+[TEST 9] ✗ FAILED: Single element tuple
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 10] Running: Enum member access and comparison
+[TEST 10] ✗ FAILED: Enum member access and comparison
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 11] Running: Using enum in function calls
+[TEST 11] ✗ FAILED: Using enum in function calls
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 12] Running: Directional constants in movement
+[TEST 12] ✗ FAILED: Directional constants in movement
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 13] Running: Exponentiation operator precedence
+[TEST 13] ✗ FAILED: Exponentiation operator precedence
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 14] Running: Comprehensive operator test
+[TEST 14] ✗ FAILED: Comprehensive operator test
+Error: Parse error at line 7: Expected newline at line 7
+
+[TEST 15] Running: Negative indexing
+[TEST 15] ✗ FAILED: Negative indexing
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 16] Running: List slicing
+[TEST 16] ✗ FAILED: List slicing
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 17] Running: List comprehension
+[TEST 17] ✗ FAILED: List comprehension
+Error: Parse error at line 5: Expected newline at line 5
+
+[TEST 18] Running: Nested function calls as arguments
+[TEST 18] ✗ FAILED: Nested function calls as arguments
+Error: Parse error at line 6: Expected newline at line 6
+
+[TEST 19] Running: Deeply nested function calls
+[TEST 19] ✗ FAILED: Deeply nested function calls
+Error: Parse error at line 9: Expected newline at line 9
+
+[TEST 20] Running: Nested for loops
+[TEST 20] ✗ FAILED: Nested for loops
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 21] Running: Nested while loops
+[TEST 21] ✗ FAILED: Nested while loops
+Error: Parse error at line 7: Parse error at line 7: Parse error at line 7: Expected newline at line 7
+
+[TEST 22] Running: Triple nested loops
+[TEST 22] ✗ FAILED: Triple nested loops
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 23] Running: Recursion with factorial
+[TEST 23] ✗ FAILED: Recursion with factorial
+Error: Parse error at line 6: Parse error at line 6: Expected newline at line 6
+
+[TEST 24] Running: Recursion with Fibonacci
+[TEST 24] ✗ FAILED: Recursion with Fibonacci
+Error: Parse error at line 6: Parse error at line 6: Expected newline at line 6
+
+[TEST 25] Running: Break and continue in loops
+[TEST 25] ✗ FAILED: Break and continue in loops
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 26] Running: Break in nested loops
+[TEST 26] ✗ FAILED: Break in nested loops
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 27] Running: While loop with complex conditions
+[TEST 27] ✗ FAILED: While loop with complex conditions
+Error: Parse error at line 5: Parse error at line 5: Expected newline at line 5
+
+[TEST 28] Running: String concatenation
+[TEST 28] ✗ FAILED: String concatenation
+Error: Parse error at line 5: Expected newline at line 5
+
+[TEST 29] Running: String indexing
+[TEST 29] ✗ FAILED: String indexing
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 30] Running: Compound assignment operators
+[TEST 30] ✗ FAILED: Compound assignment operators
+Error: Parse error at line 5: Expected newline at line 5
+
+[TEST 31] Running: Large loop (tests instruction budget / time slicing)
+[TEST 31] ✗ FAILED: Large loop (tests instruction budget / time slicing)
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 32] Running: Nested large loops (tests frame distribution)
+[TEST 32] ✗ FAILED: Nested large loops (tests frame distribution)
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 33] Running: Game movement functions
+[TEST 33] ✗ FAILED: Game movement functions
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 34] Running: Game harvest functions
+[TEST 34] ✗ FAILED: Game harvest functions
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 35] Running: Plant and harvest cycle
+[TEST 35] ✗ FAILED: Plant and harvest cycle
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 36] Running: Full integration test
+[TEST 36] ✗ FAILED: Full integration test
+Error: Parse error at line 5: Parse error at line 5: Expected ':' after for clause at line 5, got ')'
+
+[TEST 37] Running: Complex game logic
+[TEST 37] ✗ FAILED: Complex game logic
+Error: Parse error at line 7: Parse error at line 7: Expected ':' after for clause at line 7, got '
+'
+
+[TEST 38] Running: sleep() with integer argument
+[TEST 38] ✗ FAILED: sleep() with integer argument
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 39] Running: sleep() with float argument
+[TEST 39] ✗ FAILED: sleep() with float argument
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 40] Running: sleep() with decimal values
+[TEST 40] ✗ FAILED: sleep() with decimal values
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 41] Running: sleep() inside loop (should pause each iteration)
+[TEST 41] ✗ FAILED: sleep() inside loop (should pause each iteration)
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 42] Running: sleep(0) - should still yield once
+[TEST 42] ✗ FAILED: sleep(0) - should still yield once
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 43] Running: Move in all 4 directions with constants
+[TEST 43] ✗ FAILED: Move in all 4 directions with constants
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 44] Running: Move using string directions
+[TEST 44] ✗ FAILED: Move using string directions
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 45] Running: Harvest in a loop (time budget dependent)
+[TEST 45] ✗ FAILED: Harvest in a loop (time budget dependent)
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 46] Running: Plant different entities in sequence
+[TEST 46] ✗ FAILED: Plant different entities in sequence
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 47] Running: Till ground before planting
+[TEST 47] ✗ FAILED: Till ground before planting
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 48] Running: Use items from inventory
+[TEST 48] ✗ FAILED: Use items from inventory
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 49] Running: Easter egg function (1 second animation)
+[TEST 49] ✗ FAILED: Easter egg function (1 second animation)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 50] Running: can_harvest() returns instantly
+[TEST 50] ✗ FAILED: can_harvest() returns instantly
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 51] Running: get_ground_type() returns instantly
+[TEST 51] ✗ FAILED: get_ground_type() returns instantly
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 52] Running: get_entity_type() returns instantly
+[TEST 52] ✗ FAILED: get_entity_type() returns instantly
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 53] Running: Position functions return instantly
+[TEST 53] ✗ FAILED: Position functions return instantly
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 54] Running: get_world_size() returns instantly
+[TEST 54] ✗ FAILED: get_world_size() returns instantly
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 55] Running: get_water() returns instantly (0.0 to 1.0)
+[TEST 55] ✗ FAILED: get_water() returns instantly (0.0 to 1.0)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 56] Running: num_items() for all item types (instant)
+[TEST 56] ✗ FAILED: num_items() for all item types (instant)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 57] Running: is_even() and is_odd() helpers (instant)
+[TEST 57] ✗ FAILED: is_even() and is_odd() helpers (instant)
+Error: Parse error at line 3: Expected ':' after for clause at line 3, got ')'
+
+[TEST 58] Running: Mix of instant and yielding operations
+[TEST 58] ✗ FAILED: Mix of instant and yielding operations
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 59] Running: Fast queries in loop with occasional yields
+[TEST 59] ✗ FAILED: Fast queries in loop with occasional yields
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 60] Running: Scan entire grid (mix of instant queries and movement)
+[TEST 60] ✗ FAILED: Scan entire grid (mix of instant queries and movement)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 61] Running: Instruction budget triggers (no sleep/game commands)
+[TEST 61] ✗ FAILED: Instruction budget triggers (no sleep/game commands)
+Error: Parse error at line 5: Expected ':' after for clause at line 5, got ')'
+
+[TEST 62] Running: Small operations complete in one frame
+[TEST 62] ✗ FAILED: Small operations complete in one frame
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 63] Running: Instruction budget + explicit sleep
+[TEST 63] ✗ FAILED: Instruction budget + explicit sleep
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 64] Running: Integer automatically converts to float for sleep
+[TEST 64] ✗ FAILED: Integer automatically converts to float for sleep
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 65] Running: Number type handling (all stored as double)
+[TEST 65] ✗ FAILED: Number type handling (all stored as double)
+Error: Parse error at line 7: Expected newline at line 7
+
+[TEST 66] Running: String to number conversion
+[TEST 66] ✗ FAILED: String to number conversion
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 67] Running: Complete farming cycle
+[TEST 67] ✗ FAILED: Complete farming cycle
+Error: Parse error at line 3: Expected indented block after function definition at line 4, got '
+'
+
+[TEST 68] Running: Farm a grid pattern
+[TEST 68] ✗ FAILED: Farm a grid pattern
+Error: Parse error at line 4: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 69] Running: Spiral harvest pattern
+[TEST 69] ✗ FAILED: Spiral harvest pattern
+Error: Parse error at line 7: Parse error at line 7: Expected ':' after for clause at line 7, got '
+'
+
+[TEST 70] Running: Resource management logic
+[TEST 70] ✗ FAILED: Resource management logic
+Error: Parse error at line 4: Parse error at line 4: Expected newline at line 4
+
+[TEST 71] Running: sleep() with 0 should still yield once
+[TEST 71] ✗ FAILED: sleep() with 0 should still yield once
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 72] Running: Negative sleep (should probably error or treat as 0)
+[TEST 72] ✗ FAILED: Negative sleep (should probably error or treat as 0)
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 73] Running: Invalid direction should error
+[TEST 73] ✗ FAILED: Invalid direction should error
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 74] Running: Using item when not enough in inventory
+[TEST 74] ✗ FAILED: Using item when not enough in inventory
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 75] Running: Planting with invalid entity
+[TEST 75] ✗ FAILED: Planting with invalid entity
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 76] Running: Many instant function calls (should be fast)
+[TEST 76] ✗ FAILED: Many instant function calls (should be fast)
+Error: Parse error at line 4: Expected ':' after for clause at line 4, got ')'
+
+[TEST 77] Running: Performance with mixed operations
+[TEST 77] ✗ FAILED: Performance with mixed operations
+Error: Parse error at line 6: Expected ':' after for clause at line 6, got ')'
+
+[TEST 78] Running: Lambda functions using game queries
+[TEST 78] ✗ FAILED: Lambda functions using game queries
+Error: Parse error at line 6: Expected newline at line 6
+
+[TEST 79] Running: Sort entities by distance from origin
+[TEST 79] ✗ FAILED: Sort entities by distance from origin
+Error: Parse error at line 3: Unexpected token: 
+
+
+[TEST 80] Running: Complete game simulation
+[TEST 80] ✗ FAILED: Complete game simulation
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 81] Running: Python-style number equality
+[TEST 81] ✗ FAILED: Python-style number equality
+Error: Parse error at line 8: Parse error at line 8: Expected newline at line 8
+
+[TEST 82] Running: List indexing requires integers (not floats)
+[TEST 82] ✗ FAILED: List indexing requires integers (not floats)
+Error: Parse error at line 6: Expected newline at line 6
+
+[TEST 83] Running: range() requires integers
+[TEST 83] ✗ FAILED: range() requires integers
+Error: Parse error at line 4: Expected newline at line 4
+
+[TEST 84] Running: Slicing requires integer indices
+[TEST 84] ✗ FAILED: Slicing requires integer indices
+Error: Parse error at line 6: Expected newline at line 6
+
+[TEST 85] Running: Number display (Python format)
+[TEST 85] ✗ FAILED: Number display (Python format)
+Error: Parse error at line 8: Expected newline at line 8
+
+[TEST 86] Running: Mixed int/float arithmetic (Python behavior)
+[TEST 86] ✗ FAILED: Mixed int/float arithmetic (Python behavior)
+Error: Parse error at line 7: Expected newline at line 7
+========================================
+TEST SUITE COMPLETE
+Tests Run: 86
+Passed: 0
+Failed: 86
+Success Rate: 0.0%
+========================================

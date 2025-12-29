@@ -1,0 +1,882 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<loop_language_project>
+  <metadata>
+    <project_name>LOOP Language - Python Interpreter for Unity</project_name>
+    <version>1.0</version>
+    <unity_version>Unity 2022+ (.NET 2.0 Compatibility Mode)</unity_version>
+    <status>Production Ready - 82.6% Test Pass Rate (71/86)</status>
+    <last_updated>2025-12-29</last_updated>
+  </metadata>
+
+  <!-- ============================================ -->
+  <!-- DELIVERABLE 1: PROJECT MAP TEMPLATE -->
+  <!-- ============================================ -->
+  <project_map>
+    <description>
+      Complete architectural overview of LOOP Language.
+      Paste this section at the start of new conversations to provide full context.
+    </description>
+
+    <architecture_overview>
+      <pipeline>
+        Source Code → Lexer → Tokens → Parser → AST → Interpreter → Execution
+      </pipeline>
+      <execution_model>
+        Coroutine-based with frame budget management for Unity integration.
+        Game functions yield control, pure Python functions execute synchronously.
+      </execution_model>
+      <target_platform>Unity .NET 2.0 (cannot use modern C# features)</target_platform>
+    </architecture_overview>
+
+    <files>
+      <!-- CORE PIPELINE -->
+      <file>
+        <name>Lexer.cs</name>
+        <layer>Frontend - Lexical Analysis</layer>
+        <responsibility>Converts source code string into token stream with indentation tracking</responsibility>
+        <key_signatures>
+          <method>List&lt;Token&gt; Tokenize(string input)</method>
+          <method>void ProcessIndentation() - Emits INDENT/DEDENT tokens</method>
+          <method>void ScanToken() - Dispatches character to token handlers</method>
+        </key_signatures>
+        <key_features>
+          - Python-style indentation handling (spaces only, tabs→4 spaces)
+          - Comment support (# and //)
+          - String literals with escape sequences
+          - All operators (arithmetic, comparison, bitwise, logical)
+          - Keywords: if/elif/else, while, for, def, class, lambda, etc.
+        </key_features>
+        <dependencies>Token.cs, Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Adding new operators or keywords
+          - Changing comment syntax
+          - Adding string literal features
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>Token.cs</name>
+        <layer>Frontend - Data Structures</layer>
+        <responsibility>Defines Token class and TokenType enumeration</responsibility>
+        <key_signatures>
+          <enum>TokenType - 60+ token types organized by category</enum>
+          <property>TokenType Type</property>
+          <property>string Lexeme - Original text</property>
+          <property>object Literal - Parsed value for numbers/strings</property>
+          <property>int LineNumber - For error reporting</property>
+        </key_signatures>
+        <key_features>
+          - Comprehensive token types: structural, literals, keywords, operators
+          - Immutable token design
+          - Debugging ToString() support
+        </key_features>
+        <dependencies>None (pure data structure)</dependencies>
+        <modification_triggers>
+          - Adding new token types
+          - Adding token metadata
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>Parser.cs</name>
+        <layer>Frontend - Syntactic Analysis</layer>
+        <responsibility>Builds Abstract Syntax Tree from token stream using recursive descent</responsibility>
+        <key_signatures>
+          <method>List&lt;Stmt&gt; Parse(List&lt;Token&gt; tokens)</method>
+          <method>Stmt Statement() - Top-level statement dispatcher</method>
+          <method>Expr Expression() - Entry point for expression parsing</method>
+          <method>List&lt;Stmt&gt; Block() - Indented code blocks</method>
+        </key_signatures>
+        <key_features>
+          - Recursive descent parser with proper precedence
+          - Python-style block structure (INDENT/DEDENT)
+          - Operator precedence: ** > unary > * / % > + - > shifts > & > ^ > | > comparisons > not > and > or
+          - Lambda, list comprehension, conditional expression support
+        </key_features>
+        <dependencies>Token.cs, AST.cs, Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Adding new statement types
+          - Changing operator precedence
+          - Adding new expression forms
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>AST.cs</name>
+        <layer>Frontend - Data Structures</layer>
+        <responsibility>Defines all Abstract Syntax Tree node classes (Stmt and Expr hierarchies)</responsibility>
+        <key_signatures>
+          <class>abstract ASTNode - Base for all nodes</class>
+          <class>abstract Stmt : ASTNode - Base for statements</class>
+          <class>abstract Expr : ASTNode - Base for expressions</class>
+        </key_signatures>
+        <key_features>
+          Statement types:
+          - ExpressionStmt, AssignmentStmt, SubscriptAssignmentStmt, MemberAssignmentStmt
+          - IfStmt, WhileStmt, ForStmt
+          - FunctionDefStmt, ClassDefStmt
+          - ReturnStmt, BreakStmt, ContinueStmt, PassStmt
+          - GlobalStmt, ImportStmt
+          
+          Expression types:
+          - BinaryExpr, UnaryExpr, LiteralExpr, VariableExpr
+          - CallExpr (with KeywordArguments support), IndexExpr, SliceExpr
+          - ListExpr, TupleExpr, DictExpr
+          - LambdaExpr, ListCompExpr
+          - MemberAccessExpr, ConditionalExpr
+        </key_features>
+        <dependencies>Token.cs (for TokenType in BinaryExpr/UnaryExpr)</dependencies>
+        <modification_triggers>
+          - Adding new language features (new node types)
+          - Changing expression/statement structure
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>PythonInterpreter.cs</name>
+        <layer>Backend - Execution Engine</layer>
+        <responsibility>Tree-walking interpreter that executes AST nodes and manages runtime state</responsibility>
+        <key_signatures>
+          <method>IEnumerator Execute(List&lt;Stmt&gt; statements)</method>
+          <method>IEnumerator ExecuteStatement(Stmt stmt) - Statement dispatcher</method>
+          <method>object Evaluate(Expr expr) - Expression evaluator</method>
+          <method>bool ShouldYield() - Frame budget management</method>
+          <field>Scope currentScope - Variable environment</field>
+          <field>int instructionsExecuted - Budget tracking</field>
+        </key_signatures>
+        <key_features>
+          - Coroutine-based execution (IEnumerator) for Unity integration
+          - Frame budget: yields after 1000 instructions
+          - Complete Python semantics: lists, tuples, dicts, lambdas, classes
+          - Built-in functions: print, len, range, sorted, min, max, sum, int, float, str, etc.
+          - List/dict methods: append, pop, keys, values, etc.
+          - Break/continue exception handling (.NET 2.0 compatible)
+          - String/number/list operations with proper type handling
+        </key_features>
+        <dependencies>
+          AST.cs, Scope.cs, Exceptions.cs, NumberHandling.cs, 
+          BuiltinFunction.cs, LambdaFunction.cs, ClassInstance.cs,
+          GameBuiltinMethods.cs, GameEnums.cs
+        </dependencies>
+        <modification_triggers>
+          - Adding new built-in functions
+          - Implementing new operators
+          - Adding new data types or operations
+          - Fixing execution bugs
+        </modification_triggers>
+      </file>
+
+      <!-- RUNTIME SUPPORT -->
+      <file>
+        <name>Scope.cs</name>
+        <layer>Runtime - Environment Management</layer>
+        <responsibility>Variable scope with parent chain for nested scopes (closures)</responsibility>
+        <key_signatures>
+          <method>void Define(string name, object value) - Local variable</method>
+          <method>void Set(string name, object value) - Update variable</method>
+          <method>object Get(string name) - Retrieve variable</method>
+          <method>bool Contains(string name) - Check existence</method>
+          <method>Scope GetGlobalScope() - Walk to root</method>
+        </key_signatures>
+        <key_features>
+          - Parent chain for nested scopes
+          - Supports closures for lambdas and functions
+          - Global scope at root
+        </key_features>
+        <dependencies>Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Changing variable lookup semantics
+          - Adding scope-related features
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>NumberHandling.cs</name>
+        <layer>Runtime - Type System</layer>
+        <responsibility>Python-style number semantics and conversions</responsibility>
+        <key_signatures>
+          <method>double ToNumber(object value) - Convert to double</method>
+          <method>int ToInteger(object value, string context) - Strict integer conversion</method>
+          <method>int ToListIndex(object value, int listLength) - Handle negative indices</method>
+          <method>bool NumbersEqual(object a, object b) - Python equality (1 == 1.0)</method>
+          <method>int CompareNumbers(object a, object b) - Three-way comparison</method>
+          <method>string NumberToString(double value) - Display format (1.0 → "1")</method>
+        </key_signatures>
+        <key_features>
+          - All numbers stored as double internally
+          - 1 == 1.0 returns true (Python semantics)
+          - Strict integer requirements for indexing/slicing/range
+          - Proper display formatting
+        </key_features>
+        <dependencies>Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Changing numeric conversion rules
+          - Adding numeric operations
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>Exceptions.cs</name>
+        <layer>Runtime - Error Handling</layer>
+        <responsibility>All exception types used by interpreter</responsibility>
+        <key_signatures>
+          <exception>LoopException - Base exception</exception>
+          <exception>LexerError - Tokenization errors</exception>
+          <exception>ParserError - Syntax errors</exception>
+          <exception>RuntimeError - Execution errors</exception>
+          <exception>BreakException - Loop control</exception>
+          <exception>ContinueException - Loop control</exception>
+          <exception>ReturnException - Function returns</exception>
+        </key_signatures>
+        <key_features>
+          - Hierarchical exception structure
+          - Line number tracking for debugging
+          - Control flow exceptions (break/continue/return)
+        </key_features>
+        <dependencies>None</dependencies>
+        <modification_triggers>
+          - Adding new exception types
+          - Enhancing error messages
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>BuiltinFunction.cs</name>
+        <layer>Runtime - Function System</layer>
+        <responsibility>Wrapper for C# functions callable from Python code</responsibility>
+        <key_signatures>
+          <method>object Call(List&lt;object&gt; arguments) - Sync execution</method>
+          <method>IEnumerator CallAsync(List&lt;object&gt; arguments) - Async execution</method>
+          <method>bool IsAsync() - Check if yields</method>
+        </key_signatures>
+        <key_features>
+          - Supports both sync and async (coroutine) functions
+          - Used for both Python built-ins and game functions
+        </key_features>
+        <dependencies>Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Changing function call mechanism
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>LambdaFunction.cs</name>
+        <layer>Runtime - Function System</layer>
+        <responsibility>Runtime representation of lambda expressions with closure capture</responsibility>
+        <key_signatures>
+          <property>List&lt;string&gt; Parameters</property>
+          <property>Expr Body</property>
+          <property>Scope ClosureScope</property>
+          <method>object Call(PythonInterpreter interpreter, List&lt;object&gt; arguments)</method>
+        </key_signatures>
+        <key_features>
+          - Captures closure scope
+          - Supports IIFE (Immediately Invoked Function Expression)
+          - Parameter binding and evaluation
+        </key_features>
+        <dependencies>AST.cs, Scope.cs, Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Changing lambda semantics
+          - Adding lambda features
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>ClassInstance.cs</name>
+        <layer>Runtime - Object System</layer>
+        <responsibility>Runtime representation of class instances</responsibility>
+        <key_signatures>
+          <method>void SetField(string name, object value)</method>
+          <method>object GetField(string name)</method>
+          <method>FunctionDefStmt GetMethod(string name)</method>
+          <method>bool HasField(string name)</method>
+          <method>bool HasMethod(string name)</method>
+        </key_signatures>
+        <key_features>
+          - Instance field storage
+          - Method lookup
+          - Simple OOP support
+        </key_features>
+        <dependencies>AST.cs, Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Enhancing OOP features
+          - Adding inheritance
+        </modification_triggers>
+      </file>
+
+      <!-- GAME INTEGRATION -->
+      <file>
+        <name>GameBuiltinMethods.cs</name>
+        <layer>Game Integration</layer>
+        <responsibility>All game-specific functions (move, harvest, plant, etc.)</responsibility>
+        <key_signatures>
+          Time Budget Dependent (IEnumerator):
+          <method>IEnumerator Move(List&lt;object&gt; args)</method>
+          <method>IEnumerator Harvest(List&lt;object&gt; args)</method>
+          <method>IEnumerator Plant(List&lt;object&gt; args)</method>
+          <method>IEnumerator Till(List&lt;object&gt; args)</method>
+          <method>IEnumerator UseItem(List&lt;object&gt; args)</method>
+          <method>IEnumerator DoAFlip(List&lt;object&gt; args)</method>
+          
+          Time Budget Independent (object):
+          <method>object CanHarvest(List&lt;object&gt; args)</method>
+          <method>object GetGroundType(List&lt;object&gt; args)</method>
+          <method>object GetEntityType(List&lt;object&gt; args)</method>
+          <method>object GetPosX(List&lt;object&gt; args)</method>
+          <method>object GetPosY(List&lt;object&gt; args)</method>
+          <method>object GetWorldSize(List&lt;object&gt; args)</method>
+          <method>object GetWater(List&lt;object&gt; args)</method>
+          <method>object NumItems(List&lt;object&gt; args)</method>
+          <method>object IsEven(List&lt;object&gt; args)</method>
+          <method>object IsOdd(List&lt;object&gt; args)</method>
+        </key_signatures>
+        <key_features>
+          - Mock game state (replace with real game integration)
+          - Query functions return instantly (no yield)
+          - Action functions yield (simulate animation time)
+        </key_features>
+        <dependencies>UnityEngine, Exceptions.cs</dependencies>
+        <modification_triggers>
+          - Adding new game commands
+          - Integrating with real game systems
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>GameEnums.cs</name>
+        <layer>Game Integration</layer>
+        <responsibility>Enum-like constants accessible from Python (Grounds, Items, Entities)</responsibility>
+        <key_signatures>
+          <class>Grounds - Soil, Turf, Grassland</class>
+          <class>Items - Hay, Wood, Carrot, Pumpkin, Power, Sunflower, Water</class>
+          <class>Entities - Grass, Bush, Tree, Carrot, Pumpkin, Sunflower</class>
+        </key_signatures>
+        <key_features>
+          - Static readonly strings (accessed as Grounds.Soil)
+          - Imported automatically by interpreter
+        </key_features>
+        <dependencies>None</dependencies>
+        <modification_triggers>
+          - Adding new enum categories
+          - Adding new enum values
+        </modification_triggers>
+      </file>
+
+      <!-- UNITY INTEGRATION -->
+      <file>
+        <name>CoroutineRunner.cs</name>
+        <layer>Unity Integration</layer>
+        <responsibility>Unity MonoBehaviour that executes interpreter with error handling</responsibility>
+        <key_signatures>
+          <method>void Run(string sourceCode) - Execute script</method>
+          <method>void Stop() - Halt execution</method>
+          <method>IEnumerator ExecuteCode(string sourceCode) - Main execution loop</method>
+        </key_signatures>
+        <key_features>
+          - Integrates Lexer → Parser → Interpreter pipeline
+          - Catches and displays all exceptions
+          - .NET 2.0 compatible error handling (can't yield in try-catch)
+          - Manages execution state
+        </key_features>
+        <dependencies>
+          UnityEngine, Lexer.cs, Parser.cs, PythonInterpreter.cs,
+          GameBuiltinMethods.cs, ConsoleManager.cs, Exceptions.cs
+        </dependencies>
+        <modification_triggers>
+          - Changing execution lifecycle
+          - Adding execution hooks
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>ConsoleManager.cs</name>
+        <layer>Unity UI</layer>
+        <responsibility>In-game console UI for print() output and error messages</responsibility>
+        <key_signatures>
+          <method>void WriteLine(string message)</method>
+          <method>void Write(string message)</method>
+          <method>void Clear()</method>
+        </key_signatures>
+        <key_features>
+          - TextMeshPro UI integration
+          - Auto-scrolling
+          - Line limit management
+        </key_features>
+        <dependencies>UnityEngine, UnityEngine.UI, TMPro</dependencies>
+        <modification_triggers>
+          - Changing console UI behavior
+          - Adding console features
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>TestRunner.cs</name>
+        <layer>Testing Infrastructure</layer>
+        <responsibility>Automated test execution and reporting</responsibility>
+        <key_signatures>
+          <method>IEnumerator RunAllTests() - Execute full suite</method>
+          <method>void RunTest(int index) - Execute single test</method>
+          <method>IEnumerator RunSingleTest(int index, string script)</method>
+        </key_signatures>
+        <key_features>
+          - Runs 86 tests from DemoScripts/ComprehensiveTestSuite
+          - Reports pass/fail statistics
+          - Delay between tests configurable
+        </key_features>
+        <dependencies>
+          UnityEngine, CoroutineRunner.cs, DemoScripts.cs,
+          Lexer.cs, Parser.cs, PythonInterpreter.cs, GameBuiltinMethods.cs
+        </dependencies>
+        <modification_triggers>
+          - Adding test features
+          - Changing test reporting
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>DemoScripts.cs</name>
+        <layer>Testing Infrastructure</layer>
+        <responsibility>35 original test scripts covering core language features</responsibility>
+        <key_features>
+          - Lambda expressions, tuples, enums
+          - Operators and control flow
+          - List operations and recursion
+          - Game functions and movement
+        </key_features>
+        <dependencies>None (pure test data)</dependencies>
+        <modification_triggers>
+          - Adding new test cases
+        </modification_triggers>
+      </file>
+
+      <file>
+        <name>ComprehensiveTestSuite.cs</name>
+        <layer>Testing Infrastructure</layer>
+        <responsibility>51 extended test scripts covering advanced features and edge cases</responsibility>
+        <key_features>
+          - Sleep/timing, performance tests
+          - Number handling, type conversions
+          - Complex game scenarios
+          - Error handling tests (try/except - not supported)
+        </key_features>
+        <dependencies>None (pure test data)</dependencies>
+        <modification_triggers>
+          - Adding new test cases
+        </modification_triggers>
+      </file>
+    </files>
+
+    <current_known_issues>
+      <issue>
+        <category>Parser Limitations</category>
+        <description>Parser requires clean formatting - blank lines after colons cause errors</description>
+        <affected_tests>TEST 37, 59, 60, 67, 68, 69, 77</affected_tests>
+        <workaround>Remove blank lines immediately after for:, def:, if:, etc.</workaround>
+        <fix_location>Parser.cs - ConsumeNewline() and Block() methods</fix_location>
+      </issue>
+
+      <issue>
+        <category>Missing Feature: try/except</category>
+        <description>Exception handling syntax not implemented</description>
+        <affected_tests>TEST 72, 73, 74, 75</affected_tests>
+        <workaround>None - feature not implemented</workaround>
+        <fix_location>
+          1. Token.cs - Add TRY, EXCEPT, FINALLY, RAISE tokens
+          2. AST.cs - Add TryStmt, ExceptClause nodes
+          3. Parser.cs - Add TryStatement() method
+          4. PythonInterpreter.cs - Add ExecuteTry() method
+        </fix_location>
+      </issue>
+
+      <issue>
+        <category>Known Limitation: Keyword Arguments</category>
+        <description>Parser doesn't support func(key=value) syntax</description>
+        <affected_tests>Some tests use key= which is parsed incorrectly</affected_tests>
+        <workaround>Use positional arguments: sorted(data, lambda x: x[1])</workaround>
+        <fix_location>Parser.cs - CallExpr parsing needs keyword argument support</fix_location>
+      </issue>
+
+      <issue>
+        <category>Unexpected Token Errors</category>
+        <description>TEST 79 - "Unexpected token" error</description>
+        <status>Needs investigation</status>
+        <fix_location>Unknown - needs test script examination</fix_location>
+      </issue>
+    </current_known_issues>
+
+    <test_status>
+      <total>86</total>
+      <passed>71</passed>
+      <failed>15</failed>
+      <success_rate>82.6%</success_rate>
+      <failure_breakdown>
+        <category name="Parser formatting">7 tests</category>
+        <category name="try/except not implemented">4 tests</category>
+        <category name="Other/Unknown">4 tests</category>
+      </failure_breakdown>
+    </test_status>
+  </project_map>
+
+  <!-- ============================================ -->
+  <!-- DELIVERABLE 2: SCOUT PROMPT TEMPLATE -->
+  <!-- ============================================ -->
+  <scout_prompt_template>
+    <description>
+      Use this standardized prompt when requesting new features.
+      Claude will analyze the Project Map and tell you which specific files to upload.
+    </description>
+
+    <template><![CDATA[
+# LOOP Language Feature Request - Scout Mode
+
+## Project Context
+[Paste the entire <project_map> section from LOOP_LANGUAGE_STATELESS_WORKFLOW.xml here]
+
+## Feature Request
+**Feature Name:** [Brief name, e.g., "Modulo Operator Support"]
+
+**Description:** 
+[Clear description of what you want to add/change]
+
+**Example Usage:**
+```python
+# Example of how the feature should work
+result = 10 % 3  # Should return 1
+print(result)
+```
+
+**Expected Behavior:**
+[What should happen when this feature is used]
+
+## Instructions for Claude
+**DO NOT generate any code yet.**
+
+Please analyze the Project Map and tell me:
+1. **Which 2-5 specific files need to be modified** (in order of importance)
+2. **What changes are needed in each file** (high-level overview)
+3. **Any potential complications or dependencies** I should be aware of
+4. **Whether this is a simple change (1 file), moderate (2-3 files), or complex (4+ files)**
+
+After your analysis, I will upload only the files you specify, and then you can generate the complete solution.
+    ]]></template>
+
+    <example_usage>
+      See the workflow_example section below for a complete walkthrough.
+    </example_usage>
+  </scout_prompt_template>
+
+  <!-- ============================================ -->
+  <!-- DELIVERABLE 3: WORKFLOW EXAMPLE -->
+  <!-- ============================================ -->
+  <workflow_example>
+    <scenario>Adding a Modulo (%) operator to the language</scenario>
+    <note>The modulo operator is actually already implemented, but this demonstrates the workflow</note>
+
+    <step number="1">
+      <title>User Sends Scout Prompt</title>
+      <user_message><![CDATA[
+# LOOP Language Feature Request - Scout Mode
+
+## Project Context
+[Full project_map XML pasted here - omitted for brevity]
+
+## Feature Request
+**Feature Name:** Modulo Operator Support
+
+**Description:** 
+Add support for the modulo operator (%) to perform remainder division.
+
+**Example Usage:**
+```python
+result = 10 % 3  # Should return 1
+print(result)
+
+x = 17
+y = 5
+remainder = x % y  # Should return 2
+```
+
+**Expected Behavior:**
+- `10 % 3` should return `1`
+- `17 % 5` should return `2`
+- Should work with variables and expressions
+- Should follow Python's modulo semantics (same sign as divisor)
+
+## Instructions for Claude
+**DO NOT generate any code yet.**
+
+Please analyze the Project Map and tell me which files need modification.
+      ]]></user_message>
+    </step>
+
+    <step number="2">
+      <title>Claude Analyzes and Responds</title>
+      <claude_response><![CDATA[
+Based on the Project Map analysis, here's what's needed:
+
+## Files to Modify (in order):
+
+### 1. **Token.cs** (CRITICAL)
+- **Change:** Add `PERCENT` token type if not present
+- **Why:** The lexer needs to recognize `%` as a valid token
+- **Complexity:** Simple enum addition
+
+### 2. **Lexer.cs** (CRITICAL)
+- **Change:** Add tokenization for `%` character in ScanToken()
+- **Why:** Must convert `%` character to PERCENT token
+- **Complexity:** Simple switch case addition
+
+### 3. **PythonInterpreter.cs** (CRITICAL)
+- **Change:** Add PERCENT case in EvaluateBinary() method
+- **Implementation:** `case TokenType.PERCENT: return leftNum % rightNum;`
+- **Why:** Actually performs the modulo operation
+- **Complexity:** Simple switch case addition
+
+## Assessment:
+- **Complexity:** SIMPLE (3 files, minimal changes)
+- **Risk:** Very low - adding operator, not changing existing behavior
+- **Testing:** Add test case in DemoScripts.cs
+- **Dependencies:** None - standalone feature
+
+## Potential Issues:
+1. **Negative number behavior:** Python's `%` returns same sign as divisor. C#'s `%` returns same sign as dividend. Need to ensure Python semantics.
+   - Example: Python: `-10 % 3 = 2`, C#: `-10 % 3 = -1`
+   - Solution: Use formula: `((a % b) + b) % b` for Python semantics
+
+2. **Division by zero:** Need to handle `x % 0` gracefully
+   - Should throw RuntimeError("Modulo by zero")
+
+## Next Step:
+Please upload these 3 files in this order:
+1. Token.cs
+2. Lexer.cs  
+3. PythonInterpreter.cs
+
+I'll then provide the complete implementation with proper Python modulo semantics.
+      ]]></claude_response>
+    </step>
+
+    <step number="3">
+      <title>User Uploads Requested Files</title>
+      <user_message><![CDATA[
+Here are the 3 files you requested:
+[Uploads Token.cs, Lexer.cs, PythonInterpreter.cs]
+
+Please implement the modulo operator with proper Python semantics (handling negative numbers correctly).
+      ]]></user_message>
+    </step>
+
+    <step number="4">
+      <title>Claude Generates Solution</title>
+      <claude_response><![CDATA[
+Perfect! I'll implement the modulo operator with Python semantics. Here are the changes:
+
+## 1. Token.cs
+[Shows the PERCENT token is already present in the enum]
+
+✅ **Token.cs already has PERCENT token - no changes needed!**
+
+## 2. Lexer.cs
+[Shows that '%' is already tokenized]
+
+✅ **Lexer.cs already handles '%' - no changes needed!**
+
+## 3. PythonInterpreter.cs
+
+Looking at EvaluateBinary(), I see the modulo operator needs to be added. Here's the implementation with Python semantics:
+
+```csharp
+// In EvaluateBinary() switch statement, add:
+case TokenType.PERCENT:
+    // Python modulo semantics (result has same sign as divisor)
+    if (Math.Abs(rightNum) < 0.0000001)
+    {
+        throw new RuntimeError("Modulo by zero");
+    }
+    double result = leftNum % rightNum;
+    // Adjust for Python semantics: result should have same sign as divisor
+    if ((result > 0 && rightNum < 0) || (result < 0 && rightNum > 0))
+    {
+        result += rightNum;
+    }
+    return result;
+```
+
+## Testing
+
+Add this test to DemoScripts.cs:
+
+```python
+# Test: Modulo operator
+print(10 % 3)      # Expected: 1
+print(17 % 5)      # Expected: 2
+print(-10 % 3)     # Expected: 2 (Python semantics)
+print(10 % -3)     # Expected: -2 (Python semantics)
+print(15 % 4)      # Expected: 3
+```
+
+## Result
+
+✅ Modulo operator fully implemented with Python semantics!
+✅ Handles negative numbers correctly
+✅ Handles division by zero
+✅ Ready to test
+
+Actually, looking at the code again, I see PERCENT is already in the switch! Let me verify the current implementation matches Python semantics...
+
+[Continue with detailed implementation]
+      ]]></claude_response>
+    </step>
+
+    <benefits>
+      <benefit>Only 3 files uploaded instead of all 18 (83% reduction)</benefit>
+      <benefit>Claude focuses on relevant code only</benefit>
+      <benefit>Faster analysis and response</benefit>
+      <benefit>Clearer understanding of required changes</benefit>
+      <benefit>Reduced token usage</benefit>
+      <benefit>Can work on project indefinitely without hitting limits</benefit>
+    </benefits>
+  </workflow_example>
+
+  <!-- ============================================ -->
+  <!-- USAGE GUIDELINES -->
+  <!-- ============================================ -->
+  <usage_guidelines>
+    <guideline>
+      <title>Starting a New Conversation</title>
+      <steps>
+        <step>Copy the entire &lt;project_map&gt; section</step>
+        <step>Paste it into your first message</step>
+        <step>Claude now understands your entire architecture</step>
+        <step>Proceed with feature request using Scout Prompt</step>
+      </steps>
+    </guideline>
+
+    <guideline>
+      <title>For Simple Changes (1-2 files)</title>
+      <steps>
+        <step>Use Scout Prompt to identify files</step>
+        <step>Upload only those files</step>
+        <step>Get immediate solution</step>
+      </steps>
+      <example>Adding a new built-in function: only PythonInterpreter.cs needed</example>
+    </guideline>
+
+    <guideline>
+      <title>For Complex Changes (4+ files)</title>
+      <steps>
+        <step>Use Scout Prompt to get full analysis</step>
+        <step>Upload files in the order Claude specifies</step>
+        <step>Claude can request additional files if needed</step>
+        <step>Implement changes iteratively</step>
+      </steps>
+      <example>Adding try/except: Token.cs, AST.cs, Parser.cs, PythonInterpreter.cs, Exceptions.cs</example>
+    </guideline>
+
+    <guideline>
+      <title>For Bug Fixes</title>
+      <steps>
+        <step>Provide Project Map + error message/test failure</step>
+        <step>Claude identifies likely files</step>
+        <step>Upload only suspected files</step>
+        <step>Get targeted fix</step>
+      </steps>
+    </guideline>
+
+    <guideline>
+      <title>Updating the Project Map</title>
+      <when>After major changes or adding new files</when>
+      <steps>
+        <step>Update the relevant file entry in project_map</step>
+        <step>Add new files to the files section</step>
+        <step>Update current_known_issues if bugs fixed</step>
+        <step>Update test_status with new pass rate</step>
+      </steps>
+      <note>Keep this XML file in your project repo and version control it</note>
+    </guideline>
+  </usage_guidelines>
+
+  <!-- ============================================ -->
+  <!-- COMMON FEATURE PATTERNS -->
+  <!-- ============================================ -->
+  <common_patterns>
+    <pattern>
+      <name>Adding a New Operator</name>
+      <files>Token.cs, Lexer.cs, PythonInterpreter.cs</files>
+      <complexity>Simple</complexity>
+      <example>Adding ?? (null coalescing)</example>
+    </pattern>
+
+    <pattern>
+      <name>Adding a New Built-in Function</name>
+      <files>PythonInterpreter.cs (RegisterBuiltins method)</files>
+      <complexity>Simple</complexity>
+      <example>Adding abs(), round(), etc.</example>
+    </pattern>
+
+    <pattern>
+      <name>Adding a New Statement Type</name>
+      <files>Token.cs, AST.cs, Parser.cs, PythonInterpreter.cs</files>
+      <complexity>Moderate</complexity>
+      <example>Adding match/case (switch statement)</example>
+    </pattern>
+
+    <pattern>
+      <name>Adding a New Game Command</name>
+      <files>GameBuiltinMethods.cs, PythonInterpreter.cs (RegisterGameBuiltins)</files>
+      <complexity>Simple</complexity>
+      <example>Adding teleport(), trade(), etc.</example>
+    </pattern>
+
+    <pattern>
+      <name>Adding Exception Handling (try/except)</name>
+      <files>Token.cs, AST.cs, Parser.cs, PythonInterpreter.cs, Exceptions.cs</files>
+      <complexity>Complex</complexity>
+      <estimated_effort>4-8 hours</estimated_effort>
+    </pattern>
+
+    <pattern>
+      <name>Fixing a Runtime Bug</name>
+      <files>Usually PythonInterpreter.cs only, sometimes NumberHandling.cs or Scope.cs</files>
+      <complexity>Varies</complexity>
+      <example>Fixing string slicing, sorting bugs</example>
+    </pattern>
+
+    <pattern>
+      <name>Fixing a Parser Bug</name>
+      <files>Parser.cs, sometimes AST.cs</files>
+      <complexity>Moderate</complexity>
+      <example>Fixing blank line handling, precedence issues</example>
+    </pattern>
+  </common_patterns>
+
+  <!-- ============================================ -->
+  <!-- TROUBLESHOOTING -->
+  <!-- ============================================ -->
+  <troubleshooting>
+    <issue>
+      <symptom>Claude asks for too many files</symptom>
+      <solution>Ask Claude to prioritize - start with top 2-3 most critical files</solution>
+    </issue>
+
+    <issue>
+      <symptom>Claude needs context from code but you didn't upload it</symptom>
+      <solution>Upload the additional file mid-conversation - Claude adapts</solution>
+    </issue>
+
+    <issue>
+      <symptom>Feature requires changing many files</symptom>
+      <solution>Break into sub-features and implement iteratively</solution>
+    </issue>
+
+    <issue>
+      <symptom>Not sure which category a change falls into</symptom>
+      <solution>Use the Scout Prompt - Claude will categorize it for you</solution>
+    </issue>
+
+    <issue>
+      <symptom>Project Map is outdated after many changes</symptom>
+      <solution>Ask Claude: "Based on these files, please update the project_map XML"</solution>
+    </issue>
+  </troubleshooting>
+</loop_language_project>
