@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -8,7 +8,7 @@ namespace LoopLanguage
 	/// Lexical analyzer that converts source code into tokens.
 	/// Handles Python-style indentation, comments, and all operators/keywords.
 	/// 
-	/// FIXED: Proper comment handling, division operator, and bracket depth tracking
+	/// FIXED: Proper comment handling and division operator
 	/// </summary>
 	public class Lexer
 	{
@@ -20,7 +20,6 @@ namespace LoopLanguage
 		private int current;
 		private int line;
 		private Stack<int> indentStack;
-		private int bracketDepth;  // ★ NEW: Track nesting depth of [], (), {}
 
 		private static readonly Dictionary<string, TokenType> keywords = new Dictionary<string, TokenType>
 		{
@@ -75,7 +74,6 @@ namespace LoopLanguage
 			line = 1;
 			indentStack = new Stack<int>();
 			indentStack.Push(0);
-			bracketDepth = 0;  // ★ NEW: Initialize bracket depth
 
 			ProcessIndentation();
 
@@ -133,17 +131,11 @@ namespace LoopLanguage
 		#region Indentation Processing
 
 		/// <summary>
-		/// ★ FIXED: Skip indentation processing when inside brackets (Python behavior)
+		/// FIXED: Properly handles comment lines - they don't affect indentation
 		/// </summary>
 		private void ProcessIndentation()
 		{
 			if (IsAtEnd()) return;
-
-			// ★ NEW: If we're inside brackets, don't process indentation
-			if (bracketDepth > 0)
-			{
-				return;
-			}
 
 			// Count leading spaces
 			int spaces = 0;
@@ -213,14 +205,6 @@ namespace LoopLanguage
 			switch (c)
 			{
 				case '\n':
-					// ★ FIXED: Inside brackets, treat newlines as whitespace
-					if (bracketDepth > 0)
-					{
-						line++;
-						// Don't emit NEWLINE token, don't process indentation
-						break;
-					}
-
 					AddToken(TokenType.NEWLINE);
 					line++;
 					ProcessIndentation();
@@ -253,33 +237,11 @@ namespace LoopLanguage
 					}
 					break;
 
-				// ★ NEW: Track bracket depth
-				case '(':
-					bracketDepth++;
-					AddToken(TokenType.LEFT_PAREN);
-					break;
-				case ')':
-					bracketDepth--;
-					AddToken(TokenType.RIGHT_PAREN);
-					break;
-				case '[':
-					bracketDepth++;
-					AddToken(TokenType.LEFT_BRACKET);
-					break;
-				case ']':
-					bracketDepth--;
-					AddToken(TokenType.RIGHT_BRACKET);
-					break;
-				case '{':
-					bracketDepth++;
-					// Note: Python uses {} for dicts, not blocks
-					break;
-				case '}':
-					bracketDepth--;
-					// Note: Python uses {} for dicts, not blocks
-					break;
-
 				// Single-character tokens
+				case '(': AddToken(TokenType.LEFT_PAREN); break;
+				case ')': AddToken(TokenType.RIGHT_PAREN); break;
+				case '[': AddToken(TokenType.LEFT_BRACKET); break;
+				case ']': AddToken(TokenType.RIGHT_BRACKET); break;
 				case ',': AddToken(TokenType.COMMA); break;
 				case '.': AddToken(TokenType.DOT); break;
 				case ':': AddToken(TokenType.COLON); break;

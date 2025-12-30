@@ -38,7 +38,7 @@ namespace LoopLanguage
 		public PythonInterpreter(GameBuiltinMethods gameCommands, ConsoleManager consoleManager = null)
 		{
 			gameBuiltins = gameCommands;
-			console = consoleManager;
+			console = consoleManager; 
 			Reset();
 		}
 		#endregion
@@ -1080,66 +1080,22 @@ namespace LoopLanguage
 			if (keyFunc != null)
 			{
 				// Sort with lambda key function
-				try
-				{
-					list.Sort((a, b) => {
-						try
-						{
-							object keyA = keyFunc.Call(this, new List<object> { a });
-							object keyB = keyFunc.Call(this, new List<object> { b });
-							int comparison = CompareObjects(keyA, keyB);
-							return reverse ? -comparison : comparison;
-						}
-						catch (RuntimeError)
-						{
-							throw;  // Re-throw runtime errors
-						}
-						catch (Exception innerEx)
-						{
-							throw new RuntimeError($"sort() key function failed: {innerEx.Message}");
-						}
-					});
-				}
-				catch (RuntimeError)
-				{
-					throw;  // Re-throw without wrapping
-				}
-				catch (Exception e)
-				{
-					throw new RuntimeError($"sort() failed during comparison: {e.Message}");
-				}
+				list.Sort((a, b) => {
+					object keyA = keyFunc.Call(this, new List<object> { a });
+					object keyB = keyFunc.Call(this, new List<object> { b });
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
 			}
 			else if (keyFuncDef != null)
 			{
 				// Sort with user-defined key function
-				try
-				{
-					list.Sort((a, b) => {
-						try
-						{
-							object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
-							object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
-							int comparison = CompareObjects(keyA, keyB);
-							return reverse ? -comparison : comparison;
-						}
-						catch (RuntimeError)
-						{
-							throw;  // Re-throw runtime errors
-						}
-						catch (Exception innerEx)
-						{
-							throw new RuntimeError($"sort() key function failed: {innerEx.Message}");
-						}
-					});
-				}
-				catch (RuntimeError)
-				{
-					throw;  // Re-throw without wrapping
-				}
-				catch (Exception e)
-				{
-					throw new RuntimeError($"sort() failed during comparison: {e.Message}");
-				}
+				list.Sort((a, b) => {
+					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
+					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
 			}
 			else
 			{
@@ -1485,7 +1441,7 @@ namespace LoopLanguage
 
 			return result;
 		}
-
+	
 		// ============================================
 		// FILE: PythonInterpreter.cs
 		// Replace EvaluateMemberAccess() method (around line 818)
