@@ -23,7 +23,7 @@ namespace SPACE_GAME
 
 		private void Update()
 		{
-			if(INPUT.K.HeldDown(KeyCode.LeftAlt) && INPUT.M.InstantDown(0))
+			if(INPUT.K.HeldDown(KeyCode.LeftControl) && INPUT.M.InstantDown(0))
 			{
 				StopAllCoroutines();
 				StartCoroutine(STIMULATE());
@@ -37,7 +37,7 @@ namespace SPACE_GAME
 			#endregion
 
 			// this.checkLOG();
-			yield return this.checkInterpreter();
+			yield return this.checkInterpreter__prev();
 			yield return null;
 		}
 		//

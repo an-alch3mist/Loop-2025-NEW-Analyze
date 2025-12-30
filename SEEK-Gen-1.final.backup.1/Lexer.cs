@@ -272,11 +272,11 @@ namespace LoopLanguage
 					break;
 				case '{':
 					bracketDepth++;
-					AddToken(TokenType.LEFT_BRACE);
+					// Note: Python uses {} for dicts, not blocks
 					break;
 				case '}':
 					bracketDepth--;
-					AddToken(TokenType.RIGHT_BRACE);
+					// Note: Python uses {} for dicts, not blocks
 					break;
 
 				// Single-character tokens

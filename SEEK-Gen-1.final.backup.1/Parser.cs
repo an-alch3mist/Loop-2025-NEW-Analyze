@@ -439,26 +439,6 @@ namespace LoopLanguage
 		{
 			Expr expr = BitwiseOr();
 
-			// Handle "not in" operator
-			if (Check(TokenType.NOT))
-			{
-				int savedPosition = current;
-				Advance(); // consume NOT
-				if (Check(TokenType.IN))
-				{
-					Advance(); // consume IN
-					Expr right = BitwiseOr();
-					// Create "not (expr in right)"
-					BinaryExpr inExpr = new BinaryExpr(expr, TokenType.IN, right);
-					expr = new UnaryExpr(TokenType.NOT, inExpr);
-				}
-				else
-				{
-					// Not "not in", restore position
-					current = savedPosition;
-				}
-			}
-
 			while (Match(TokenType.EQUAL_EQUAL, TokenType.BANG_EQUAL,
 						 TokenType.LESS, TokenType.GREATER,
 						 TokenType.LESS_EQUAL, TokenType.GREATER_EQUAL,
@@ -716,76 +696,6 @@ namespace LoopLanguage
 
 				Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list");
 				return new ListExpr(elements);
-			}
-
-			if (Match(TokenType.LEFT_BRACE))
-			{
-				// Dictionary literal: {key1: val1, key2: val2}
-
-				// Skip newlines and indentation after opening brace
-				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-				if (Match(TokenType.RIGHT_BRACE))
-				{
-					// Empty dictionary
-					return new DictExpr(new List<Expr>(), new List<Expr>());
-				}
-
-				List<Expr> keys = new List<Expr>();
-				List<Expr> values = new List<Expr>();
-
-				// Parse first key-value pair
-				Expr key = Expression();
-
-				// Skip whitespace after key
-				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-				Consume(TokenType.COLON, "Expected ':' after dictionary key");
-
-				// Skip whitespace after colon
-				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-				Expr value = Expression();
-
-				keys.Add(key);
-				values.Add(value);
-
-				// Skip whitespace after value
-				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-				// Parse remaining key-value pairs
-				while (Match(TokenType.COMMA))
-				{
-					// Skip newlines and indentation after comma
-					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-					// Allow trailing comma
-					if (Check(TokenType.RIGHT_BRACE)) break;
-
-					Expr nextKey = Expression();
-
-					// Skip whitespace after key
-					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-					Consume(TokenType.COLON, "Expected ':' after dictionary key");
-
-					// Skip whitespace after colon
-					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-					Expr nextValue = Expression();
-
-					keys.Add(nextKey);
-					values.Add(nextValue);
-
-					// Skip whitespace after value
-					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-				}
-
-				// Skip newlines and indentation before closing brace
-				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
-
-				Consume(TokenType.RIGHT_BRACE, "Expected '}' after dictionary");
-				return new DictExpr(keys, values);
 			}
 
 			throw new ParserError($"Unexpected token: {Peek().Lexeme}");

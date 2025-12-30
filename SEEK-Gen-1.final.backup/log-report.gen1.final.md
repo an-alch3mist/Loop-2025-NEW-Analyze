@@ -1,6 +1,6 @@
 =======================================
 STARTING COMPREHENSIVE TEST SUITE
-Total tests: 86
+Total tests: 79
 (35 original + 45 extended tests)
 ========================================
 
@@ -9,7 +9,7 @@ Total tests: 86
 [TEST 1] ✓ PASSED: Lambda with list comprehension inside
 
 [TEST 2] Running: Sorted with lambda accessing tuple elements
-[[1, 'b'], [2, 'c'], [3, 'a']]
+[[3, 'a'], [1, 'b'], [2, 'c']]
 [TEST 2] ✓ PASSED: Sorted with lambda accessing tuple elements
 
 [TEST 3] Running: Lambda with multiple conditions
@@ -152,11 +152,14 @@ False
 [TEST 22] Running: Triple nested loops
 8
 [TEST 22] ✓ PASSED: Triple nested loops
+
 [TEST 23] Running: Recursion with factorial
-
+120
+720
 [TEST 23] ✓ PASSED: Recursion with factorial
-[TEST 24] Running: Recursion with Fibonacci
 
+[TEST 24] Running: Recursion with Fibonacci
+55
 [TEST 24] ✓ PASSED: Recursion with Fibonacci
 
 [TEST 25] Running: Break and continue in loops
@@ -247,7 +250,7 @@ Moved to (3, 0)
 [TEST 35] ✓ PASSED: Plant and harvest cycle
 
 [TEST 36] Running: Full integration test
-Even tiles: None
+Even tiles: 13
 a
 b
 c
@@ -261,8 +264,11 @@ Complex logic test complete
 
 [TEST 38] Running: sleep() with integer argument
 Before sleep
-After 2 second sleep
-[TEST 38] ✓ PASSED: sleep() with integer argument
+
+well lets see about this
+line-0
+[TEST 38] ✗ FAILED: sleep() with integer argument -> (intentional misspelled prin to see the rich text error log inside ConsoleManager)
+RUNTIME ERROR: Undefined variable: prin
 
 [TEST 39] Running: sleep() with float argument
 Before sleep
@@ -386,8 +392,8 @@ Final position: 0 0
 [TEST 53] ✓ PASSED: Position functions return instantly
 
 [TEST 54] Running: get_world_size() returns instantly
-World size: 10
-Total tiles: 100
+World size: 5
+Total tiles: 25
 [TEST 54] ✓ PASSED: get_world_size() returns instantly
 
 [TEST 55] Running: get_water() returns instantly (0.0 to 1.0)
@@ -445,16 +451,63 @@ Done
 [TEST 58] ✓ PASSED: Mix of instant and yielding operations
 
 [TEST 59] Running: Fast queries in loop with occasional yields
-[TEST 59] ✗ FAILED: Fast queries in loop with occasional yields
-
-rror: Parse error at line 4: Expected indented block after for at line 5, got '
-'
+Progress: 0
+Progress: 10
+Progress: 20
+Progress: 30
+Progress: 40
+Progress: 50
+Progress: 60
+Progress: 70
+Progress: 80
+Progress: 90
+Completed 100 iterations
+[TEST 59] ✓ PASSED: Fast queries in loop with occasional yields
 
 [TEST 60] Running: Scan entire grid (mix of instant queries and movement)
-[TEST 60] ✗ FAILED: Scan entire grid (mix of instant queries and movement)
-
-rror: Parse error at line 8: Parse error at line 8: Expected indented block after for at line 9, got '
-'
+Scanning 5 x 5 grid
+Moved to (1, 0)
+Moved to (2, 0)
+Moved to (3, 0)
+Moved to (4, 0)
+Moved to (4, 1)
+Moved to (3, 1)
+Moved to (2, 1)
+Moved to (1, 1)
+Moved to (0, 1)
+Moved to (1, 1)
+Moved to (2, 1)
+Moved to (3, 1)
+Moved to (4, 1)
+Moved to (4, 2)
+Moved to (3, 2)
+Moved to (2, 2)
+Moved to (1, 2)
+Moved to (0, 2)
+Moved to (1, 2)
+Moved to (2, 2)
+Moved to (3, 2)
+Moved to (4, 2)
+Moved to (4, 3)
+Moved to (3, 3)
+Moved to (2, 3)
+Moved to (1, 3)
+Moved to (0, 3)
+Moved to (1, 3)
+Moved to (2, 3)
+Moved to (3, 3)
+Moved to (4, 3)
+Moved to (4, 4)
+Moved to (3, 4)
+Moved to (2, 4)
+Moved to (1, 4)
+Moved to (0, 4)
+Moved to (1, 4)
+Moved to (2, 4)
+Moved to (3, 4)
+Moved to (4, 4)
+Scanned 25 tiles
+[TEST 60] ✓ PASSED: Scan entire grid (mix of instant queries and movement)
 
 [TEST 61] Running: Instruction budget triggers (no sleep/game commands)
 Sum: 499500
@@ -492,25 +545,54 @@ Result: 45.14
 [TEST 66] ✓ PASSED: String to number conversion
 
 [TEST 67] Running: Complete farming cycle
-[TEST 67] ✗ FAILED: Complete farming cycle
-
-rror: Parse error at line 3: Expected indented block after function definition at line 4, got '
-'
+Planted carrot at (0, 0)
+[TEST 67] ✓ PASSED: Complete farming cycle
 
 [TEST 68] Running: Farm a grid pattern
-[TEST 68] ✗ FAILED: Farm a grid pattern
-
-rror: Parse error at line 5: Parse error at line 5: Parse error at line 5: Expected indented block after for at line 6, got '
-'
+Tilled ground
+Planted grass at (0, 0)
+Moved to (1, 0)
+Tilled ground
+Planted grass at (1, 0)
+Moved to (2, 0)
+Tilled ground
+Planted grass at (2, 0)
+Moved to (2, 1)
+Moved to (1, 1)
+Moved to (0, 1)
+Tilled ground
+Planted grass at (0, 1)
+Moved to (1, 1)
+Tilled ground
+Planted grass at (1, 1)
+Moved to (2, 1)
+Tilled ground
+Planted grass at (2, 1)
+Moved to (2, 2)
+Moved to (1, 2)
+Moved to (0, 2)
+Tilled ground
+Planted grass at (0, 2)
+Moved to (1, 2)
+Tilled ground
+Planted grass at (1, 2)
+Moved to (2, 2)
+Tilled ground
+Planted grass at (2, 2)
+Grid farming complete
+[TEST 68] ✓ PASSED: Farm a grid pattern
 
 [TEST 69] Running: Spiral harvest pattern
-[TEST 69] ✗ FAILED: Spiral harvest pattern
-
-rror: Parse error at line 7: Parse error at line 7: Expected indented block after for at line 8, got '
-'
+Spiral pattern ready
+[TEST 69] ✓ PASSED: Spiral harvest pattern
 
 [TEST 70] Running: Resource management logic
-Has sufficient resources: None
+=== RESOURCES ===
+Hay: 0
+Water: 50
+Power: 100
+WARNING: Low hay!
+Has sufficient resources: False
 [TEST 70] ✓ PASSED: Resource management logic
 
 [TEST 71] Running: sleep() with 0 should still yield once
@@ -521,33 +603,21 @@ Iteration: 4
 Iteration: 5
 [TEST 71] ✓ PASSED: sleep() with 0 should still yield once
 
-[TEST 72] Running: Negative sleep (should probably error or treat as 0)
-[TEST 72] ✗ FAILED: Negative sleep (should probably error or treat as 0)
-Error: Parse error at line 3: Expected newline at line 3
-
-[TEST 73] Running: Invalid direction should error
-[TEST 73] ✗ FAILED: Invalid direction should error
-Error: Parse error at line 3: Expected newline at line 3
-
-[TEST 74] Running: Using item when not enough in inventory
-[TEST 74] ✗ FAILED: Using item when not enough in inventory
-Error: Parse error at line 7: Expected newline at line 7
-
-[TEST 75] Running: Planting with invalid entity
-[TEST 75] ✗ FAILED: Planting with invalid entity
-Error: Parse error at line 3: Expected newline at line 3
-
-[TEST 76] Running: Many instant function calls (should be fast)
+[TEST 72] Running: Many instant function calls (should be fast)
 Completed 4000 instant function calls
-[TEST 76] ✓ PASSED: Many instant function calls (should be fast)
+[TEST 72] ✓ PASSED: Many instant function calls (should be fast)
 
-[TEST 77] Running: Performance with mixed operations
-[TEST 77] ✗ FAILED: Performance with mixed operations
+[TEST 73] Running: Performance with mixed operations
+Moved to (0, 0)
+Moved to (0, 0)
+Moved to (0, 0)
+Moved to (0, 0)
+Moved to (0, 0)
+Instant ops: 100
+Yield ops: 5
+[TEST 73] ✓ PASSED: Performance with mixed operations
 
-rror: Parse error at line 6: Expected indented block after for at line 7, got '
-'
-
-[TEST 78] Running: Lambda functions using game queries
+[TEST 74] Running: Lambda functions using game queries
 Position: [0, 0]
 Moved to (1, 0)
 Position: [1, 0]
@@ -555,14 +625,20 @@ Moved to (2, 0)
 Position: [2, 0]
 Moved to (3, 0)
 All positions: [[0, 0], [1, 0], [2, 0]]
-[TEST 78] ✓ PASSED: Lambda functions using game queries
+[TEST 74] ✓ PASSED: Lambda functions using game queries
 
-[TEST 79] Running: Sort entities by distance from origin
-[TEST 79] ✗ FAILED: Sort entities by distance from origin
-Error: Parse error at line 3: Unexpected token: 
+[TEST 75] Running: Sort entities by distance from origin, .sort with key
+[10, 5]
+[[1, 'c'], [1, [[3, 4], [1, 1], [0, 5], [2, 2]]]]
+Pos: [1, 1]
+Pos: [2, 2]
+Pos: [3, 4]
+Pos: [0, 5]
+[10, 4, 3, 2, 1]
+['BMW', 'Ford', 'Audi', 'Volvo']
+[TEST 75] ✓ PASSED: Sort entities by distance from origin, .sort with key
 
-
-[TEST 80] Running: Complete game simulation
+[TEST 76] Running: Complete game simulation
 === GAME SIMULATION START ===
 Starting position: 0 0
 Starting inventory: 0
@@ -582,39 +658,27 @@ Harvested! Carrots: 0
 --- Resource Check ---
 Water: 50 Power: 100
 --- Complex Logic ---
-Center: 5 5
+Center: 2 2
 Current: 0 1
 Has hay: True
 Has water: True
 === GAME SIMULATION END ===
-[TEST 80] ✓ PASSED: Complete game simulation
+[TEST 76] ✓ PASSED: Complete game simulation
 
-[TEST 81] Running: Python-style number equality
+[TEST 77] Running: Python-style number equality
 PASS: 1 == 1.0 is True
 PASS: 10/2 == 5 is True
-[TEST 81] ✓ PASSED: Python-style number equality
+[TEST 77] ✓ PASSED: Python-style number equality
 
-[TEST 82] Running: List indexing requires integers (not floats)
-[TEST 82] ✗ FAILED: List indexing requires integers (not floats)
-Error: Parse error at line 13: Expected newline at line 13
-
-[TEST 83] Running: range() requires integers
-[TEST 83] ✗ FAILED: range() requires integers
-Error: Parse error at line 12: Expected newline at line 12
-
-[TEST 84] Running: Slicing requires integer indices
-[TEST 84] ✗ FAILED: Slicing requires integer indices
-Error: Parse error at line 9: Expected newline at line 9
-
-[TEST 85] Running: Number display (Python format)
+[TEST 78] Running: Number display (Python format)
 1
 1.5
 2
 5
 3.33333333333333
-[TEST 85] ✓ PASSED: Number display (Python format)
+[TEST 78] ✓ PASSED: Number display (Python format)
 
-[TEST 86] Running: Mixed int/float arithmetic (Python behavior)
+[TEST 79] Running: Mixed int/float arithmetic (Python behavior)
 7.5
 2.5
 12.5
@@ -622,12 +686,12 @@ Error: Parse error at line 9: Expected newline at line 9
 True
 False
 True
-[TEST 86] ✓ PASSED: Mixed int/float arithmetic (Python behavior)
+[TEST 79] ✓ PASSED: Mixed int/float arithmetic (Python behavior)
 ========================================
 TEST SUITE COMPLETE
-Tests Run: 86
-Passed: 72
-Failed: 14
-Success Rate: 83.7%
+Tests Run: 79
+Passed: 78
+Failed: 1
+Success Rate: 98.7%
 ========================================
 

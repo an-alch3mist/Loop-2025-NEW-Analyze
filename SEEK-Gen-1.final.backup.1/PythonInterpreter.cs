@@ -141,7 +141,6 @@ namespace LoopLanguage
 		private IEnumerator ExecuteStatement(Stmt stmt)
 		{
 			IncrementInstructionCount();
-			currentLineNumber++;  // Track line for error reporting
 
 			if (stmt is ExpressionStmt)
 			{
@@ -344,14 +343,14 @@ namespace LoopLanguage
 				{
 					if (!dict.ContainsKey(index))
 					{
-						throw new RuntimeError(currentLineNumber, $"Key not found: {index}");
+						throw new RuntimeError($"Key not found: {index}");
 					}
 					dict[index] = ApplyCompoundOperator(dict[index], value, stmt.Operator);
 				}
 			}
 			else
 			{
-				throw new RuntimeError(currentLineNumber, "Can only assign to list or dict subscript");
+				throw new RuntimeError("Can only assign to list or dict subscript");
 			}
 		}
 
@@ -391,7 +390,7 @@ namespace LoopLanguage
 			}
 			else
 			{
-				throw new RuntimeError(currentLineNumber, "Can only assign to class instance member");
+				throw new RuntimeError("Can only assign to class instance member");
 			}
 		}
 
@@ -668,16 +667,7 @@ namespace LoopLanguage
 
 			if (expr is VariableExpr)
 			{
-				try
-				{
-					return currentScope.Get(((VariableExpr)expr).Name);
-				}
-				catch (RuntimeError e)
-				{
-					if (e.LineNumber == -1)
-						throw new RuntimeError(currentLineNumber, e.Message);
-					throw;
-				}
+				return currentScope.Get(((VariableExpr)expr).Name);
 			}
 
 			if (expr is BinaryExpr)
@@ -740,7 +730,7 @@ namespace LoopLanguage
 				return EvaluateConditional((ConditionalExpr)expr);
 			}
 
-			throw new RuntimeError(currentLineNumber, "Unknown expression type");
+			throw new RuntimeError("Unknown expression type");
 		}
 
 		private object EvaluateBinary(BinaryExpr expr)
@@ -794,14 +784,7 @@ namespace LoopLanguage
 					return str.Contains(search);
 				}
 
-				// Check if it's a dictionary
-				if (rightValue is Dictionary<object, object>)
-				{
-					Dictionary<object, object> dict = (Dictionary<object, object>)rightValue;
-					return dict.ContainsKey(leftValue);
-				}
-
-				throw new RuntimeError(currentLineNumber, "'in' requires list, string, or dict");
+				throw new RuntimeError("'in' requires list or string");
 			}
 
 			// Handle 'is' operator
@@ -851,7 +834,7 @@ namespace LoopLanguage
 				case TokenType.RIGHT_SHIFT: return (double)((int)leftNum >> (int)rightNum);
 
 				default:
-					throw new RuntimeError(currentLineNumber, $"Unknown binary operator: {expr.Operator}");
+					throw new RuntimeError($"Unknown binary operator: {expr.Operator}");
 			}
 		}
 
@@ -871,7 +854,7 @@ namespace LoopLanguage
 					return (double)(~(int)ToNumber(operand));
 
 				default:
-					throw new RuntimeError(currentLineNumber, $"Unknown unary operator: {expr.Operator}");
+					throw new RuntimeError($"Unknown unary operator: {expr.Operator}");
 			}
 		}
 
@@ -953,7 +936,7 @@ namespace LoopLanguage
 				return CreateClassInstance(classMethods, arguments);
 			}
 
-			throw new RuntimeError(currentLineNumber, "Can only call functions and classes");
+			throw new RuntimeError("Can only call functions and classes");
 		}
 
 		// ============================================
@@ -1109,21 +1092,21 @@ namespace LoopLanguage
 						}
 						catch (RuntimeError)
 						{
-							throw;
+							throw;  // Re-throw runtime errors
 						}
 						catch (Exception innerEx)
 						{
-							throw new RuntimeError("sort() key function failed: " + innerEx.Message);
+							throw new RuntimeError($"sort() key function failed: {innerEx.Message}");
 						}
 					});
 				}
 				catch (RuntimeError)
 				{
-					throw;
+					throw;  // Re-throw without wrapping
 				}
 				catch (Exception e)
 				{
-					throw new RuntimeError("sort() failed: " + e.Message);
+					throw new RuntimeError($"sort() failed during comparison: {e.Message}");
 				}
 			}
 			else if (keyFuncDef != null)
@@ -1141,21 +1124,21 @@ namespace LoopLanguage
 						}
 						catch (RuntimeError)
 						{
-							throw;
+							throw;  // Re-throw runtime errors
 						}
 						catch (Exception innerEx)
 						{
-							throw new RuntimeError("sort() key function failed: " + innerEx.Message);
+							throw new RuntimeError($"sort() key function failed: {innerEx.Message}");
 						}
 					});
 				}
 				catch (RuntimeError)
 				{
-					throw;
+					throw;  // Re-throw without wrapping
 				}
 				catch (Exception e)
 				{
-					throw new RuntimeError("sort() failed: " + e.Message);
+					throw new RuntimeError($"sort() failed during comparison: {e.Message}");
 				}
 			}
 			else
@@ -1313,12 +1296,12 @@ namespace LoopLanguage
 				Dictionary<object, object> dict = (Dictionary<object, object>)obj;
 				if (!dict.ContainsKey(index))
 				{
-					throw new RuntimeError(currentLineNumber, $"Key not found: {index}");
+					throw new RuntimeError($"Key not found: {index}");
 				}
 				return dict[index];
 			}
 
-			throw new RuntimeError(currentLineNumber, "Can only index lists, strings, and dicts");
+			throw new RuntimeError("Can only index lists, strings, and dicts");
 		}
 
 		private object EvaluateSlice(SliceExpr expr)
@@ -1734,32 +1717,12 @@ namespace LoopLanguage
 
 		private double ToNumber(object value)
 		{
-			try
-			{
-				return NumberHandling.ToNumber(value);
-			}
-			catch (RuntimeError e)
-			{
-				// Add line number if not present
-				if (e.LineNumber == -1)
-					throw new RuntimeError(currentLineNumber, e.Message);
-				throw;
-			}
+			return NumberHandling.ToNumber(value);
 		}
 
 		private int ToInt(object value)
 		{
-			try
-			{
-				return NumberHandling.ToInteger(value, "Conversion");
-			}
-			catch (RuntimeError e)
-			{
-				// Add line number if not present
-				if (e.LineNumber == -1)
-					throw new RuntimeError(currentLineNumber, e.Message);
-				throw;
-			}
+			return NumberHandling.ToInteger(value, "Conversion");
 		}
 
 		private string ToString(object value)
