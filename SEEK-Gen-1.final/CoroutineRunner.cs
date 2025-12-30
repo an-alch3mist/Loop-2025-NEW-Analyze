@@ -132,9 +132,7 @@ namespace LoopLanguage
 				Debug.LogError($"{errorType}: {errorMessage}");
 
 				if (console != null)
-				{
-					console.WriteLine(fullError);
-				}
+					console.WriteLine(fullError, isError: true);
 
 				currentExecution = null;
 				yield break;

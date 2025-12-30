@@ -223,8 +223,9 @@ namespace LoopLanguage
 
 					if (testConsole != null)
 					{
-						testConsole.WriteLine($"[TEST {testsRun}] ✗ FAILED: {testName}");
-						testConsole.WriteLine(executionErrorMsg);
+						// ★ FIX: Pass isError: true to show in red
+						testConsole.WriteLine($"[TEST {testsRun}] ✗ FAILED: {testName}", isError: true);
+						testConsole.WriteLine(executionErrorMsg, isError: true);
 					}
 				}
 				else
