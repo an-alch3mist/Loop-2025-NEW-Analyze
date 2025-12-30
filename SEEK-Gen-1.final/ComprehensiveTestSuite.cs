@@ -421,6 +421,7 @@ farming_cycle()
         
         public static readonly string TEST_GRID_FARMING = @"
 # Test: Farm a grid pattern
+size = 3
 def farm_grid(size):
     for i in range(size):
         for j in range(size):
@@ -630,12 +631,61 @@ sorted_entities = sorted(entities, key=lambda pos: (pos[0]**2 + pos[1]**2)**0.5)
 for entity in sorted_entities:
     print('Position:', entity)
 ";
-        
-        #endregion
-        
-        #region Comprehensive Integration Test
-        
-        public static readonly string TEST_FULL_GAME_SIMULATION = @"
+
+		public static readonly string TEST_SORT = @"
+# Test all the new .sort() features
+# ============================================
+
+print(""=== TEST 1: Multi-line list with comments ==="")
+entities = [
+    (3, 4),  # Distance 5
+    (1, 1),  # Distance 1.41
+    (0, 5),  # Distance 5
+    (2, 2)   # Distance 2.83
+]
+print(""Original:"", entities)
+
+print(""\n=== TEST 2: sorted() with key= keyword ==="")
+sorted_entities = sorted(entities, key=lambda pos: (pos[0]**2 + pos[1]**2)**0.5)
+print(""Sorted by distance:"")
+for entity in sorted_entities:
+    print(""  Position:"", entity)
+
+print(""=== TEST 3: .sort() method (in-place) ==="")
+cars = ['Ford', 'Mitsubishi', 'BMW', 'VW']
+print(""Before:"", cars)
+cars.sort(key=lambda car: len(car))
+print(""After sort by length:"", cars)
+
+print(""=== TEST 4: .sort() without key ==="")
+vals = [10, -1, 5.5, 0]
+print(""Before:"", vals)
+vals.sort()
+print(""After sort:"", vals)
+
+print(""=== TEST 5: sorted() with reverse= ==="")
+nums = [3, 1, 4, 1, 5, 9, 2, 6]
+ascending = sorted(nums)
+descending = sorted(nums, reverse=True)
+print(""Ascending:"", ascending)
+print(""Descending:"", descending)
+
+print(""=== TEST 6: User-defined key function ==="")
+def myFunc(e):
+    return len(e)
+
+words = ['apple', 'pie', 'a', 'cherry']
+words.sort(key=lambda w: len(w))
+print(""Sorted by length:"", words)
+
+print(""=== All tests passed! ==="")";
+
+
+		#endregion
+
+		#region Comprehensive Integration Test
+
+		public static readonly string TEST_FULL_GAME_SIMULATION = @"
 # Test: Complete game simulation
 print('=== GAME SIMULATION START ===')
 
@@ -867,6 +917,7 @@ print(x == 5.0)  # True (equality works)
             // Lambda with game functions
             TEST_LAMBDA_WITH_GAME_FUNCTIONS,
             TEST_SORTED_BY_POSITION,
+			TEST_SORT,
             
             // Integration
             TEST_FULL_GAME_SIMULATION,
@@ -877,7 +928,7 @@ print(x == 5.0)  # True (equality works)
             TEST_RANGE_REQUIRES_INTEGER,
             TEST_SLICE_REQUIRES_INTEGER,
             TEST_NUMBER_DISPLAY,
-            TEST_NUMBER_MIXED_ARITHMETIC
+            TEST_NUMBER_MIXED_ARITHMETIC,
         };
         
         #endregion
@@ -937,9 +988,18 @@ print(x == 5.0)  # True (equality works)
             
             "Lambda with game function calls",
             "Sorted by distance using lambda",
+            ".sort() features check(test)",
             
-            "Full game simulation integration test"
-        };
+            "Full game simulation integration test",
+
+			// Python-style number handling (NEW)
+            "TEST_NUMBER_EQUALITY".ToLower(),
+			"TEST_LIST_INDEX_REQUIRES_INTEGER".ToLower(),
+			"TEST_RANGE_REQUIRES_INTEGER".ToLower(),
+			"TEST_SLICE_REQUIRES_INTEGER".ToLower(),
+			"TEST_NUMBER_DISPLAY".ToLower(),
+			"TEST_NUMBER_MIXED_ARITHMETIC".ToLower(),
+		};
         
         #endregion
     }

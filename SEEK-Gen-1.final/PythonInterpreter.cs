@@ -858,14 +858,26 @@ namespace LoopLanguage
 			}
 		}
 
+		// ============================================
+		// FILE 2: PythonInterpreter.cs
+		// Replace EvaluateCall() method (around line 568)
+		// ============================================
 		private object EvaluateCall(CallExpr expr)
 		{
 			object callee = Evaluate(expr.Callee);
 
+			// Evaluate positional arguments
 			List<object> arguments = new List<object>();
 			foreach (Expr arg in expr.Arguments)
 			{
 				arguments.Add(Evaluate(arg));
+			}
+
+			// Evaluate keyword arguments
+			Dictionary<string, object> kwargs = new Dictionary<string, object>();
+			foreach (var kvp in expr.KeywordArguments)
+			{
+				kwargs[kvp.Key] = Evaluate(kvp.Value);
 			}
 
 			// Built-in function call
@@ -879,6 +891,12 @@ namespace LoopLanguage
 				}
 				else
 				{
+					// Special handling for sorted() with kwargs
+					if (func.GetName() == "sorted" && kwargs.Count > 0)
+					{
+						return SortedWithKwargs(arguments, kwargs);
+					}
+
 					return func.Call(arguments);
 				}
 			}
@@ -905,6 +923,68 @@ namespace LoopLanguage
 
 			throw new RuntimeError("Can only call functions and classes");
 		}
+		// ============================================
+		// Add this NEW method in PythonInterpreter.cs
+		// Place it after EvaluateCall() method
+		// ============================================
+		/// <summary>
+		/// Handles sorted() with keyword arguments (key=, reverse=)
+		/// Example: sorted(items, key=lambda x: x[0], reverse=True)
+		/// </summary>
+		private object SortedWithKwargs(List<object> positionalArgs, Dictionary<string, object> kwargs)
+		{
+			if (positionalArgs.Count < 1)
+			{
+				throw new RuntimeError("sorted() expects at least 1 argument");
+			}
+
+			object iterable = positionalArgs[0];
+			LambdaFunction keyFunc = null;
+			bool reverse = false;
+
+			// Check for 'key' keyword argument
+			if (kwargs.ContainsKey("key"))
+			{
+				object keyValue = kwargs["key"];
+				if (keyValue is LambdaFunction)
+				{
+					keyFunc = (LambdaFunction)keyValue;
+				}
+				else
+				{
+					throw new RuntimeError("sorted() key must be a lambda function");
+				}
+			}
+
+			// Check for 'reverse' keyword argument
+			if (kwargs.ContainsKey("reverse"))
+			{
+				reverse = IsTruthy(kwargs["reverse"]);
+			}
+
+			List<object> items = ToList(iterable);
+			List<object> result = new List<object>(items);
+
+			if (keyFunc != null)
+			{
+				result.Sort((a, b) => {
+					object keyA = keyFunc.Call(this, new List<object> { a });
+					object keyB = keyFunc.Call(this, new List<object> { b });
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
+			}
+			else
+			{
+				result.Sort((a, b) => {
+					int comparison = CompareObjects(a, b);
+					return reverse ? -comparison : comparison;
+				});
+			}
+
+			return result;
+		}
+
 
 		private object CallUserFunction(FunctionDefStmt func, List<object> arguments, ClassInstance instance)
 		{
@@ -1206,6 +1286,11 @@ namespace LoopLanguage
 			return result;
 		}
 
+		// ============================================
+		// FILE 2: PythonInterpreter.cs
+		// Replace EvaluateMemberAccess() method (around line 818)
+		// Add .sort() support for lists
+		// ============================================
 		private object EvaluateMemberAccess(MemberAccessExpr expr)
 		{
 			object obj = Evaluate(expr.Object);
@@ -1229,7 +1314,6 @@ namespace LoopLanguage
 			{
 				List<object> list = (List<object>)obj;
 
-				// Return a builtin function that operates on this list
 				switch (expr.Member)
 				{
 					case "append":
@@ -1266,6 +1350,45 @@ namespace LoopLanguage
 								throw new RuntimeError("remove() takes exactly 1 argument");
 							list.Remove(args[0]);
 							return null;
+						});
+
+					// NEW: .sort() method - sorts list in place
+					case "sort":
+						return new BuiltinFunction("sort", args => {
+							LambdaFunction keyFunc = null;
+							bool reverse = false;
+
+							// First arg can be key function
+							if (args.Count >= 1 && args[0] is LambdaFunction)
+							{
+								keyFunc = (LambdaFunction)args[0];
+							}
+
+							// Second arg can be reverse flag
+							if (args.Count >= 2)
+							{
+								reverse = IsTruthy(args[1]);
+							}
+
+							// Sort the list in place
+							if (keyFunc != null)
+							{
+								list.Sort((a, b) => {
+									object keyA = keyFunc.Call(this, new List<object> { a });
+									object keyB = keyFunc.Call(this, new List<object> { b });
+									int comparison = CompareObjects(keyA, keyB);
+									return reverse ? -comparison : comparison;
+								});
+							}
+							else
+							{
+								list.Sort((a, b) => {
+									int comparison = CompareObjects(a, b);
+									return reverse ? -comparison : comparison;
+								});
+							}
+
+							return null; // .sort() returns None like Python
 						});
 
 					default:

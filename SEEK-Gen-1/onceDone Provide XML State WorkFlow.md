@@ -31,4 +31,4 @@ Show me exactly how our interaction would look using the prompts you just design
 			Modification Frequency
 		2. Dependency Graph of scripts
 		3. Execution Pipeline
-		4. and more  details as you seem fit
+		4. and more File Details & Signatures details as you seem fit

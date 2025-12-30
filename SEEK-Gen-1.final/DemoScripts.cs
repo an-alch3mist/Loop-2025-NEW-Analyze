@@ -524,31 +524,26 @@ def spiral_harvest(size):
     y = 0
     
     for layer in range(size // 2):
-        # Move right
         for i in range(size - 2 * layer - 1):
             move(East)
             if can_harvest():
                 harvest()
         
-        # Move down
         for i in range(size - 2 * layer - 1):
             move(South)
             if can_harvest():
                 harvest()
         
-        # Move left
         for i in range(size - 2 * layer - 1):
             move(West)
             if can_harvest():
                 harvest()
         
-        # Move up
         for i in range(size - 2 * layer - 1):
             move(North)
             if can_harvest():
                 harvest()
 
-# spiral_harvest(5)  # Would execute if grid was setup
 print('Complex logic test complete')
 ";
         

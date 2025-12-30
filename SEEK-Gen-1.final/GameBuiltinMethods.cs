@@ -17,7 +17,7 @@ namespace LoopLanguage
         private Vector2Int playerPosition = new Vector2Int(0, 0);
         private string currentGroundType = "soil";
         private Dictionary<string, int> inventory = new Dictionary<string, int>();
-        private int worldSize = 10;
+        private int worldSize = 5;
         
         #endregion
         

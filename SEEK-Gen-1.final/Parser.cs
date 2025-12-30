@@ -563,6 +563,11 @@ namespace LoopLanguage
 			return Primary();
 		}
 
+		// ============================================
+		// FILE 1: Parser.cs
+		// Replace the Primary() method (around line 477)
+		// ============================================
+
 		private Expr Primary()
 		{
 			if (Match(TokenType.TRUE)) return new LiteralExpr(true);
@@ -590,7 +595,6 @@ namespace LoopLanguage
 				// Could be grouped expression or tuple
 				if (Match(TokenType.RIGHT_PAREN))
 				{
-					// Empty tuple
 					return new TupleExpr(new List<Expr>());
 				}
 
@@ -605,8 +609,12 @@ namespace LoopLanguage
 					{
 						do
 						{
+							// Skip newlines inside tuples (for multi-line tuples)
+							while (Match(TokenType.NEWLINE)) { }
+
+							if (Check(TokenType.RIGHT_PAREN)) break;
 							elements.Add(Expression());
-						} while (Match(TokenType.COMMA) && !Check(TokenType.RIGHT_PAREN));
+						} while (Match(TokenType.COMMA));
 					}
 
 					Consume(TokenType.RIGHT_PAREN, "Expected ')' after tuple");
@@ -620,6 +628,10 @@ namespace LoopLanguage
 			if (Match(TokenType.LEFT_BRACKET))
 			{
 				// List or list comprehension
+
+				// Skip newlines after opening bracket (for multi-line lists)
+				while (Match(TokenType.NEWLINE)) { }
+
 				if (Match(TokenType.RIGHT_BRACKET))
 				{
 					return new ListExpr(new List<Expr>());
@@ -633,14 +645,12 @@ namespace LoopLanguage
 					Token variable = Consume(TokenType.IDENTIFIER, "Expected variable in list comprehension");
 					Consume(TokenType.IN, "Expected 'in' in list comprehension");
 
-					// ★ FIX: Use LogicalOr() instead of Expression() to prevent
-					// Conditional() from consuming the filter's 'if' token
 					Expr iterable = LogicalOr();
 
 					Expr condition = null;
 					if (Match(TokenType.IF))
 					{
-						condition = LogicalOr();  // Skip Conditional() to avoid nested ternary check
+						condition = LogicalOr();
 					}
 
 					Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list comprehension");
@@ -652,9 +662,15 @@ namespace LoopLanguage
 
 				while (Match(TokenType.COMMA))
 				{
+					// Skip newlines after comma (for multi-line lists)
+					while (Match(TokenType.NEWLINE)) { }
+
 					if (Check(TokenType.RIGHT_BRACKET)) break;
 					elements.Add(Expression());
 				}
+
+				// Skip newlines before closing bracket
+				while (Match(TokenType.NEWLINE)) { }
 
 				Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list");
 				return new ListExpr(elements);
