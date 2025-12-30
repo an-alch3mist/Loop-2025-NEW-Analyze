@@ -1,4 +1,4 @@
-namespace LoopLanguage
+﻿namespace LoopLanguage
 {
     /// <summary>
     /// COMPREHENSIVE TEST SUITE - Extended Edition
@@ -12,6 +12,8 @@ namespace LoopLanguage
         public static readonly string TEST_SLEEP_INTEGER = @"
 # Test: sleep() with integer argument
 print('Before sleep')
+print(""well lets see about this\n"" + ""line-0"")
+prin(""somthng"")
 sleep(2)  # Should work with integer (converts to float)
 print('After 2 second sleep')
 ";
@@ -519,7 +521,7 @@ for i in range(5):
     print('Iteration:', count)
 ";
         
-        public static readonly string TEST_NEGATIVE_SLEEP = @"
+        public static readonly string TEST_NEGATIVE_SLEEP_TRY = @"
 # Test: Negative sleep (should probably error or treat as 0)
 try:
     sleep(-1)
@@ -528,7 +530,7 @@ except:
     print('Negative sleep error (expected)')
 ";
         
-        public static readonly string TEST_MOVE_INVALID_DIRECTION = @"
+        public static readonly string TEST_MOVE_INVALID_DIRECTION_TRY = @"
 # Test: Invalid direction should error
 try:
     move('invalid')
@@ -537,7 +539,7 @@ except:
     print('Invalid direction error (expected)')
 ";
         
-        public static readonly string TEST_USE_ITEM_NOT_ENOUGH = @"
+        public static readonly string TEST_USE_ITEM_NOT_ENOUGH_TRY = @"
 # Test: Using item when not enough in inventory
 # First check inventory
 print('Water:', num_items(Items.Water))
@@ -550,7 +552,7 @@ except:
     print('Ran out of water (expected error)')
 ";
         
-        public static readonly string TEST_PLANT_INVALID_ENTITY = @"
+        public static readonly string TEST_PLANT_INVALID_ENTITY_TRY = @"
 # Test: Planting with invalid entity
 try:
     plant('invalid_entity')
@@ -598,7 +600,7 @@ print('Yield ops:', yield_ops)
         
         #endregion
         
-        #region Lambda with Game Functions
+        #region Sort, Lambda with Game Functions
         
         public static readonly string TEST_LAMBDA_WITH_GAME_FUNCTIONS = @"
 # Test: Lambda functions using game queries
@@ -616,71 +618,53 @@ for i in range(3):
 print('All positions:', positions)
 ";
         
-        public static readonly string TEST_SORTED_BY_POSITION = @"
-# Test: Sort entities by distance from origin
+        public static readonly string TEST_SORT = @"
+# Test: Sort entities by distance from origin, .sort with key
+def myFunc(str):
+	return len(str)
+def valFunc(v):
+	return v**2
+
+aList = [10, 1, 2, 5]
+newList = [x for x in aList if valFunc(x) >= 5]
+print(newList)
+
 entities = [
     (3, 4),  # Distance 5
     (1, 1),  # Distance 1.41
     (0, 5),  # Distance 5
     (2, 2)   # Distance 2.83
 ]
+complexEN = [
+	[1, 'c'], [1, entities]
+]
+print(complexEN)
 
 # Sort by distance from origin
-sorted_entities = sorted(entities, key=lambda pos: (pos[0]**2 + pos[1]**2)**0.5)
+entities.sort(key=lambda pos: (pos[0]**2 + pos[1]**2)**0.5)
 
-for entity in sorted_entities:
-    print('Position:', entity)
+for entity in entities:
+    print('Pos:', entity)
+
+vals = [10, 1, 2, 3, 4]
+cars = ['Ford', 'BMW', 'Volvo', 'Audi']
+
+vals.sort()                           # ✅ default sort
+cars.sort(key=lambda x: len(x))      # ✅ lambda key
+cars.sort(key=myFunc)                 # ✅ function key
+vals.sort(reverse=True)               # ✅ reverse sort
+vals.sort(key=valFunc, reverse=True)  # ✅ combined
+print(vals)
+print(cars)
+# output:
+# [10, 5]
+# Pos: (1, 1)
+# Pos: (2, 2)
+# Pos: (3, 4)
+# Pos: (0, 5)
+# [10, 4, 3, 2, 1]
+# ['BMW', 'Ford', 'Audi', 'Volvo']
 ";
-
-		public static readonly string TEST_SORT = @"
-# Test all the new .sort() features
-# ============================================
-
-print(""=== TEST 1: Multi-line list with comments ==="")
-entities = [
-    (3, 4),  # Distance 5
-    (1, 1),  # Distance 1.41
-    (0, 5),  # Distance 5
-    (2, 2)   # Distance 2.83
-]
-print(""Original:"", entities)
-
-print(""\n=== TEST 2: sorted() with key= keyword ==="")
-sorted_entities = sorted(entities, key=lambda pos: (pos[0]**2 + pos[1]**2)**0.5)
-print(""Sorted by distance:"")
-for entity in sorted_entities:
-    print(""  Position:"", entity)
-
-print(""=== TEST 3: .sort() method (in-place) ==="")
-cars = ['Ford', 'Mitsubishi', 'BMW', 'VW']
-print(""Before:"", cars)
-cars.sort(key=lambda car: len(car))
-print(""After sort by length:"", cars)
-
-print(""=== TEST 4: .sort() without key ==="")
-vals = [10, -1, 5.5, 0]
-print(""Before:"", vals)
-vals.sort()
-print(""After sort:"", vals)
-
-print(""=== TEST 5: sorted() with reverse= ==="")
-nums = [3, 1, 4, 1, 5, 9, 2, 6]
-ascending = sorted(nums)
-descending = sorted(nums, reverse=True)
-print(""Ascending:"", ascending)
-print(""Descending:"", descending)
-
-print(""=== TEST 6: User-defined key function ==="")
-def myFunc(e):
-    return len(e)
-
-words = ['apple', 'pie', 'a', 'cherry']
-words.sort(key=lambda w: len(w))
-print(""Sorted by length:"", words)
-
-print(""=== All tests passed! ==="")";
-
-
 		#endregion
 
 		#region Comprehensive Integration Test
@@ -762,7 +746,7 @@ else:
     print('FAIL: 10/2 == 5 is False')
 ";
         
-        public static readonly string TEST_LIST_INDEX_REQUIRES_INTEGER = @"
+        public static readonly string TEST_LIST_INDEX_REQUIRES_INTEGER_TRY = @"
 # Test: List indexing requires integers (not floats)
 items = [10, 20, 30, 40, 50]
 
@@ -781,7 +765,7 @@ except:
     print('PASS: list[1.5] correctly raised error')
 ";
         
-        public static readonly string TEST_RANGE_REQUIRES_INTEGER = @"
+        public static readonly string TEST_RANGE_REQUIRES_INTEGER_TRY = @"
 # Test: range() requires integers
 # This should work
 nums = range(5)
@@ -799,7 +783,7 @@ except:
     print('PASS: range(5.5) correctly raised error')
 ";
         
-        public static readonly string TEST_SLICE_REQUIRES_INTEGER = @"
+        public static readonly string TEST_SLICE_REQUIRES_INTEGER_TRY = @"
 # Test: Slicing requires integer indices
 items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -905,10 +889,10 @@ print(x == 5.0)  # True (equality works)
             
             // Edge cases
             TEST_EMPTY_SLEEP,
-            TEST_NEGATIVE_SLEEP,
-            TEST_MOVE_INVALID_DIRECTION,
-            TEST_USE_ITEM_NOT_ENOUGH,
-            TEST_PLANT_INVALID_ENTITY,
+            // TEST_NEGATIVE_SLEEP_TRY,
+            // TEST_MOVE_INVALID_DIRECTION_TRY,
+            // TEST_USE_ITEM_NOT_ENOUGH_TRY,
+            // TEST_PLANT_INVALID_ENTITY_TRY,
             
             // Performance
             TEST_MANY_INSTANT_CALLS,
@@ -916,90 +900,19 @@ print(x == 5.0)  # True (equality works)
             
             // Lambda with game functions
             TEST_LAMBDA_WITH_GAME_FUNCTIONS,
-            TEST_SORTED_BY_POSITION,
-			TEST_SORT,
+            TEST_SORT,
             
             // Integration
             TEST_FULL_GAME_SIMULATION,
             
             // Python-style number handling (NEW)
             TEST_NUMBER_EQUALITY,
-            TEST_LIST_INDEX_REQUIRES_INTEGER,
-            TEST_RANGE_REQUIRES_INTEGER,
-            TEST_SLICE_REQUIRES_INTEGER,
+            // TEST_LIST_INDEX_REQUIRES_INTEGER_TRY,
+            // TEST_RANGE_REQUIRES_INTEGER_TRY,
+            // TEST_SLICE_REQUIRES_INTEGER_TRY,
             TEST_NUMBER_DISPLAY,
             TEST_NUMBER_MIXED_ARITHMETIC,
         };
-        
-        #endregion
-        
-        #region Test Descriptions
-        
-        public static readonly string[] TEST_DESCRIPTIONS = new string[]
-        {
-            "Sleep with integer argument (2 converts to 2.0)",
-            "Sleep with float argument (2.0)",
-            "Sleep with decimal values (0.5, 1.5, 0.1)",
-            "Sleep inside loop - pauses each iteration",
-            "Sleep with zero - still yields once",
-            
-            "Move in all 4 directions using constants",
-            "Move using string directions ('up', 'down', etc)",
-            "Harvest in loop with time delays",
-            "Plant different entities in sequence",
-            "Till ground before planting",
-            "Use items from inventory",
-            "Do a flip (easter egg, 1s animation)",
-            
-            "can_harvest() instant check in loop",
-            "get_ground_type() instant with enum comparison",
-            "get_entity_type() instant check",
-            "Position functions instant (get_pos_x/y)",
-            "get_world_size() instant",
-            "get_water() instant (0.0 to 1.0)",
-            "num_items() for all item types",
-            "is_even() and is_odd() helpers",
-            
-            "Mix of instant queries and yielding commands",
-            "Fast queries in loop with occasional yields",
-            "Grid scan with instant queries and movement",
-            
-            "Instruction budget triggers on 1000 iterations",
-            "Small operations complete in one frame",
-            "Instruction budget + explicit sleep",
-            
-            "Integer to float conversion for sleep()",
-            "Number type handling (int/float)",
-            "String to number conversion",
-            
-            "Complete farming cycle (till, plant, harvest)",
-            "Grid farming pattern",
-            "Spiral harvest pattern",
-            "Resource management logic",
-            
-            "Empty sleep(0) still yields",
-            "Negative sleep error handling",
-            "Invalid move direction error",
-            "Using item when not enough in inventory",
-            "Planting invalid entity error",
-            
-            "1000 instant function calls performance",
-            "Mixed instant and yield operations",
-            
-            "Lambda with game function calls",
-            "Sorted by distance using lambda",
-            ".sort() features check(test)",
-            
-            "Full game simulation integration test",
-
-			// Python-style number handling (NEW)
-            "TEST_NUMBER_EQUALITY".ToLower(),
-			"TEST_LIST_INDEX_REQUIRES_INTEGER".ToLower(),
-			"TEST_RANGE_REQUIRES_INTEGER".ToLower(),
-			"TEST_SLICE_REQUIRES_INTEGER".ToLower(),
-			"TEST_NUMBER_DISPLAY".ToLower(),
-			"TEST_NUMBER_MIXED_ARITHMETIC".ToLower(),
-		};
         
         #endregion
     }

@@ -14,7 +14,7 @@ namespace LoopLanguage
         
         [Header("Test Configuration")]
         [SerializeField] private bool runOnStart = false;
-        [SerializeField] private float delayBetweenTests = 0.5f;
+        [SerializeField] private float delayBetweenTests = 0.1f;
         
         #endregion
         
@@ -118,92 +118,140 @@ namespace LoopLanguage
             Debug.Log($"Success Rate: {(testsPassed * 100.0 / testsRun):F1}%");
             Debug.Log("========================================");
         }
-        
-        private IEnumerator RunSingleTest(int testIndex, string testScript)
-        {
-            testsRun++;
-            
-            string testName = ExtractTestName(testScript);
-            
-            Debug.Log($"\n[TEST {testsRun}] Running: {testName}");
-            
-            // .NET 2.0 Compliance: Cannot yield inside try-catch
-            // Solution: Store execution routine outside try-catch, then yield
-            IEnumerator execution = null;
-            bool hasError = false;
-            string errorMessage = "";
-            
-            try
-            {
-                // Create a temporary interpreter for this test
-                GameBuiltinMethods gameBuiltins = new GameBuiltinMethods();
-                PythonInterpreter interpreter = new PythonInterpreter(gameBuiltins);
-                
-                // Lexical analysis
-                Lexer lexer = new Lexer();
-                var tokens = lexer.Tokenize(testScript);
-                
-                // Parsing
-                Parser parser = new Parser();
-                var ast = parser.Parse(tokens);
-                
-                // Get execution routine (don't execute yet)
-                execution = interpreter.Execute(ast);
-            }
-            catch (System.Exception e)
-            {
-                hasError = true;
-                errorMessage = e.Message;
-            }
-            
-            // Now execute outside try-catch (safe to yield here)
-            if (!hasError && execution != null)
-            {
-                bool executionError = false;
-                string executionErrorMsg = "";
+		private IEnumerator RunSingleTest(int testIndex, string testScript)
+		{
+			testsRun++;
 
-				while (execution.MoveNext())
+			string testName = ExtractTestName(testScript);
+
+			Debug.Log($"\n[TEST {testsRun}] Running: {testName}");
+
+			// ★ CHANGED: Get ConsoleManager reference from CoroutineRunner
+			ConsoleManager testConsole = runner.GetComponent<ConsoleManager>();
+
+			if (testConsole != null)
+			{
+				testConsole.WriteLine($"\n[TEST {testsRun}] Running: {testName}");
+			}
+
+			// .NET 2.0 Compliance: Cannot yield inside try-catch
+			// Solution: Store execution routine outside try-catch, then yield
+			IEnumerator execution = null;
+			bool hasError = false;
+			string errorMessage = "";
+
+			try
+			{
+				// Create a temporary interpreter for this test
+				GameBuiltinMethods gameBuiltins = new GameBuiltinMethods();
+
+				// ★ CHANGED: Pass ConsoleManager to interpreter
+				PythonInterpreter interpreter = new PythonInterpreter(gameBuiltins, testConsole);
+
+				// Lexical analysis
+				Lexer lexer = new Lexer();
+				var tokens = lexer.Tokenize(testScript);
+
+				// Parsing
+				Parser parser = new Parser();
+				var ast = parser.Parse(tokens);
+
+				// Get execution routine (don't execute yet)
+				execution = interpreter.Execute(ast);
+			}
+			catch (System.Exception e)
+			{
+				hasError = true;
+				errorMessage = e.Message;
+			}
+
+			// Now execute outside try-catch (safe to yield here)
+			if (!hasError && execution != null)
+			{
+				bool executionError = false;
+				string executionErrorMsg = "";
+
+				// ★ FIXED: Properly catch exceptions during execution
+				while (true)
 				{
-					bool execCurrNotNull = false;
+					bool hasMore = false;
+
 					try
 					{
-						if (execution.Current != null)
-						{
-							execCurrNotNull = true;
-						}
+						hasMore = execution.MoveNext();
+					}
+					catch (RuntimeError e)
+					{
+						executionError = true;
+						executionErrorMsg = $"RUNTIME ERROR: {e.Message}";
+						break;
+					}
+					catch (BreakException)
+					{
+						executionError = true;
+						executionErrorMsg = "CONTROL FLOW ERROR: break outside loop";
+						break;
+					}
+					catch (ContinueException)
+					{
+						executionError = true;
+						executionErrorMsg = "CONTROL FLOW ERROR: continue outside loop";
+						break;
 					}
 					catch (System.Exception e)
 					{
 						executionError = true;
-						executionErrorMsg = e.Message;
+						executionErrorMsg = $"UNEXPECTED ERROR: {e.Message}";
 						break;
 					}
 
-					if (execCurrNotNull)
+					if (!hasMore) break;
+
+					// ★ FIXED: Yield current value if it exists (for game commands)
+					if (execution.Current != null)
+					{
 						yield return execution.Current;
+					}
 				}
-                
-                if (executionError)
-                {
-                    testsFailed++;
-                    Debug.LogError($"[TEST {testsRun}] ✗ FAILED: {testName}");
-                    Debug.LogError($"Execution Error: {executionErrorMsg}");
-                }
-                else
-                {
-                    testsPassed++;
-                    Debug.Log($"[TEST {testsRun}] ✓ PASSED: {testName}");
-                }
-            }
-            else if (hasError)
-            {
-                testsFailed++;
-                Debug.LogError($"[TEST {testsRun}] ✗ FAILED: {testName}");
-                Debug.LogError($"Error: {errorMessage}");
-            }
-        }
-        
-        private string ExtractTestName(string script)
+
+				// ★ CHANGED: Display results to both Unity console and ConsoleManager
+				if (executionError)
+				{
+					testsFailed++;
+					Debug.LogError($"[TEST {testsRun}] ✗ FAILED: {testName}");
+					Debug.LogError(executionErrorMsg);
+
+					if (testConsole != null)
+					{
+						testConsole.WriteLine($"[TEST {testsRun}] ✗ FAILED: {testName}");
+						testConsole.WriteLine(executionErrorMsg);
+					}
+				}
+				else
+				{
+					testsPassed++;
+					Debug.Log($"[TEST {testsRun}] ✓ PASSED: {testName}");
+
+					if (testConsole != null)
+					{
+						testConsole.WriteLine($"[TEST {testsRun}] ✓ PASSED: {testName}");
+					}
+				}
+			}
+			else if (hasError)
+			{
+				testsFailed++;
+				Debug.LogError($"[TEST {testsRun}] ✗ FAILED: {testName}");
+				Debug.LogError($"Error: {errorMessage}");
+
+				if (testConsole != null)
+				{
+					testConsole.WriteLine($"[TEST {testsRun}] ✗ FAILED: {testName}");
+					testConsole.WriteLine($"Error: {errorMessage}");
+				}
+			}
+		}
+		private string ExtractTestName(string script)
         {
             // Extract test name from first comment line
             int commentIndex = script.IndexOf("# Test:");

@@ -37,37 +37,41 @@ namespace LoopLanguage
             
             Clear();
         }
-        
-        #endregion
-        
-        #region Public Methods
-        
-        /// <summary>
-        /// Writes a line to the console
-        /// </summary>
-        public void WriteLine(string message)
-        {
-            consoleContent += message + "\n";
-            lineCount++;
-            
-            // Trim old lines if exceeding max
-            if (lineCount > maxLines)
-            {
-                int firstNewlineIndex = consoleContent.IndexOf('\n');
-                if (firstNewlineIndex != -1)
-                {
-                    consoleContent = consoleContent.Substring(firstNewlineIndex + 1);
-                    lineCount--;
-                }
-            }
-            
-            UpdateDisplay();
-        }
-        
-        /// <summary>
-        /// Writes text without newline
-        /// </summary>
-        public void Write(string message)
+
+		#endregion
+
+		#region Public Methods
+
+		/// <summary>
+		/// Writes a line to the console with optional color
+		/// </summary>
+		public void WriteLine(string message, bool isError = false)
+		{
+			if (isError)
+				consoleContent += "<color=red>" + message + "</color>\n";
+			else
+				consoleContent += message + "\n";
+
+			lineCount++;
+
+			// Trim old lines if exceeding max
+			if (lineCount > maxLines)
+			{
+				int firstNewlineIndex = consoleContent.IndexOf('\n');
+				if (firstNewlineIndex != -1)
+				{
+					consoleContent = consoleContent.Substring(firstNewlineIndex + 1);
+					lineCount--;
+				}
+			}
+
+			UpdateDisplay();
+		}
+
+		/// <summary>
+		/// Writes text without newline
+		/// </summary>
+		public void Write(string message)
         {
             consoleContent += message;
             UpdateDisplay();
@@ -92,15 +96,19 @@ namespace LoopLanguage
             if (consoleText != null)
             {
                 consoleText.text = consoleContent;
-                
-                // Scroll to bottom
-                if (scrollRect != null)
-                {
-                    Canvas.ForceUpdateCanvases();
-                    scrollRect.verticalNormalizedPosition = 0f;
-                }
+				this.ScrollToBottom();
             }
         }
+
+		private void ScrollToBottom()
+		{
+			// Scroll to bottom
+			if (scrollRect != null)
+			{
+				Canvas.ForceUpdateCanvases();
+				scrollRect.verticalNormalizedPosition = 0f;
+			}
+		}
         
         #endregion
     }

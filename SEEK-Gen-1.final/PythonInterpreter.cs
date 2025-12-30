@@ -26,6 +26,7 @@ namespace LoopLanguage
 		private HashSet<string> globalVariables;
 		private int recursionDepth;
 		private const int MAX_RECURSION_DEPTH = 100;
+		private ConsoleManager console;  // ← ADD THIS
 
 		// Control flow flags for .NET 2.0 compatibility
 		private bool breakFlag = false;
@@ -34,13 +35,12 @@ namespace LoopLanguage
 		#endregion
 
 		#region Constructor
-
-		public PythonInterpreter(GameBuiltinMethods gameCommands)
+		public PythonInterpreter(GameBuiltinMethods gameCommands, ConsoleManager consoleManager = null)
 		{
 			gameBuiltins = gameCommands;
+			console = consoleManager; 
 			Reset();
 		}
-
 		#endregion
 
 		#region Public Methods
@@ -859,9 +859,11 @@ namespace LoopLanguage
 		}
 
 		// ============================================
-		// FILE 2: PythonInterpreter.cs
+		// FILE: PythonInterpreter.cs
 		// Replace EvaluateCall() method (around line 568)
+		// This adds support for BoundListMethod with keyword arguments
 		// ============================================
+
 		private object EvaluateCall(CallExpr expr)
 		{
 			object callee = Evaluate(expr.Callee);
@@ -901,6 +903,19 @@ namespace LoopLanguage
 				}
 			}
 
+			// BoundListMethod call (for .sort() with keyword arguments)
+			if (callee is BoundListMethod)
+			{
+				BoundListMethod boundMethod = (BoundListMethod)callee;
+
+				if (boundMethod.MethodName == "sort")
+				{
+					return ExecuteListSort(boundMethod.List, arguments, kwargs);
+				}
+
+				throw new RuntimeError($"Unknown bound list method: {boundMethod.MethodName}");
+			}
+
 			// User-defined function call
 			if (callee is FunctionDefStmt)
 			{
@@ -923,6 +938,7 @@ namespace LoopLanguage
 
 			throw new RuntimeError("Can only call functions and classes");
 		}
+
 		// ============================================
 		// Add this NEW method in PythonInterpreter.cs
 		// Place it after EvaluateCall() method
@@ -985,6 +1001,122 @@ namespace LoopLanguage
 			return result;
 		}
 
+		// ============================================
+		// FILE: PythonInterpreter.cs
+		// Add this NEW method after SortedWithKwargs() (around line 648)
+		// Implements Python-style .sort() with key= and reverse= support
+		// ============================================
+
+		/// <summary>
+		/// Executes list.sort() with optional key function and reverse flag
+		/// Supports: list.sort(), list.sort(key=func), list.sort(key=func, reverse=True)
+		/// Python style: sorts in place, returns None
+		/// </summary>
+		private object ExecuteListSort(List<object> list, List<object> positionalArgs, Dictionary<string, object> kwargs)
+		{
+			LambdaFunction keyFunc = null;
+			FunctionDefStmt keyFuncDef = null;
+			bool reverse = false;
+
+			// Handle positional arguments (for backward compatibility)
+			// list.sort(lambda x: x) or list.sort(myFunc)
+			if (positionalArgs.Count >= 1)
+			{
+				if (positionalArgs[0] is LambdaFunction)
+				{
+					keyFunc = (LambdaFunction)positionalArgs[0];
+				}
+				else if (positionalArgs[0] is FunctionDefStmt)
+				{
+					keyFuncDef = (FunctionDefStmt)positionalArgs[0];
+				}
+			}
+
+			if (positionalArgs.Count >= 2)
+			{
+				reverse = IsTruthy(positionalArgs[1]);
+			}
+
+			// Handle keyword arguments (Python style)
+			// list.sort(key=lambda x: x, reverse=True)
+			if (kwargs.ContainsKey("key"))
+			{
+				object keyValue = kwargs["key"];
+				if (keyValue is LambdaFunction)
+				{
+					keyFunc = (LambdaFunction)keyValue;
+				}
+				else if (keyValue is FunctionDefStmt)
+				{
+					keyFuncDef = (FunctionDefStmt)keyValue;
+				}
+				else
+				{
+					throw new RuntimeError("sort() key must be a function or lambda");
+				}
+			}
+
+			if (kwargs.ContainsKey("reverse"))
+			{
+				reverse = IsTruthy(kwargs["reverse"]);
+			}
+
+			// Validate arguments
+			if (positionalArgs.Count > 2)
+			{
+				throw new RuntimeError("sort() takes at most 2 positional arguments");
+			}
+
+			// Validate that we only have known keyword arguments
+			foreach (string key in kwargs.Keys)
+			{
+				if (key != "key" && key != "reverse")
+				{
+					throw new RuntimeError($"sort() got unexpected keyword argument '{key}'");
+				}
+			}
+
+			// Perform the sort
+			if (keyFunc != null)
+			{
+				// Sort with lambda key function
+				list.Sort((a, b) => {
+					object keyA = keyFunc.Call(this, new List<object> { a });
+					object keyB = keyFunc.Call(this, new List<object> { b });
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
+			}
+			else if (keyFuncDef != null)
+			{
+				// Sort with user-defined key function
+				list.Sort((a, b) => {
+					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
+					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
+			}
+			else
+			{
+				// Default sort (no key function)
+				// Only works for simple comparable types
+				try
+				{
+					list.Sort((a, b) => {
+						int comparison = CompareObjects(a, b);
+						return reverse ? -comparison : comparison;
+					});
+				}
+				catch (Exception e)
+				{
+					throw new RuntimeError($"sort() cannot compare items: {e.Message}");
+				}
+			}
+
+			// Python's .sort() returns None (sorts in place)
+			return null;
+		}
 
 		private object CallUserFunction(FunctionDefStmt func, List<object> arguments, ClassInstance instance)
 		{
@@ -1285,11 +1417,11 @@ namespace LoopLanguage
 
 			return result;
 		}
-
+	
 		// ============================================
-		// FILE 2: PythonInterpreter.cs
+		// FILE: PythonInterpreter.cs
 		// Replace EvaluateMemberAccess() method (around line 818)
-		// Add .sort() support for lists
+		// This adds .sort() support with keyword arguments
 		// ============================================
 		private object EvaluateMemberAccess(MemberAccessExpr expr)
 		{
@@ -1352,44 +1484,9 @@ namespace LoopLanguage
 							return null;
 						});
 
-					// NEW: .sort() method - sorts list in place
+					// NEW: .sort() method - returns BoundListMethod for keyword argument support
 					case "sort":
-						return new BuiltinFunction("sort", args => {
-							LambdaFunction keyFunc = null;
-							bool reverse = false;
-
-							// First arg can be key function
-							if (args.Count >= 1 && args[0] is LambdaFunction)
-							{
-								keyFunc = (LambdaFunction)args[0];
-							}
-
-							// Second arg can be reverse flag
-							if (args.Count >= 2)
-							{
-								reverse = IsTruthy(args[1]);
-							}
-
-							// Sort the list in place
-							if (keyFunc != null)
-							{
-								list.Sort((a, b) => {
-									object keyA = keyFunc.Call(this, new List<object> { a });
-									object keyB = keyFunc.Call(this, new List<object> { b });
-									int comparison = CompareObjects(keyA, keyB);
-									return reverse ? -comparison : comparison;
-								});
-							}
-							else
-							{
-								list.Sort((a, b) => {
-									int comparison = CompareObjects(a, b);
-									return reverse ? -comparison : comparison;
-								});
-							}
-
-							return null; // .sort() returns None like Python
-						});
+						return new BoundListMethod(list, "sort", this);
 
 					default:
 						throw new RuntimeError($"List has no method '{expr.Member}'");
@@ -1479,7 +1576,6 @@ namespace LoopLanguage
 		#endregion
 
 		#region Helper Classes
-
 		private class BoundMethod
 		{
 			public ClassInstance Instance;
@@ -1492,6 +1588,29 @@ namespace LoopLanguage
 			}
 		}
 
+		// ============================================
+		// FILE: PythonInterpreter.cs
+		// Add this NEW class after the existing BoundMethod class (around line 1029)
+		// This enables keyword arguments for list methods like .sort()
+		// ============================================
+
+		/// <summary>
+		/// Bound list method that supports keyword arguments
+		/// Wraps a list and method name for deferred execution with kwargs
+		/// </summary>
+		private class BoundListMethod
+		{
+			public List<object> List;
+			public string MethodName;
+			public PythonInterpreter Interpreter;
+
+			public BoundListMethod(List<object> list, string methodName, PythonInterpreter interpreter)
+			{
+				List = list;
+				MethodName = methodName;
+				Interpreter = interpreter;
+			}
+		}
 		#endregion
 
 		#region Helper Methods
@@ -1625,13 +1744,14 @@ namespace LoopLanguage
 			List<string> parts = new List<string>();
 
 			foreach (object arg in args)
-			{
 				parts.Add(ToString(arg));
-			}
 
 			string output = string.Join(" ", parts.ToArray());
+			// Write to both Unity console AND ConsoleManager
 			Debug.Log(output);
 
+			if (this.console != null)
+				this.console.WriteLine(output);
 			return null;
 		}
 

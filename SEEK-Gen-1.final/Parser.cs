@@ -564,10 +564,10 @@ namespace LoopLanguage
 		}
 
 		// ============================================
-		// FILE 1: Parser.cs
+		// FILE: Parser.cs
 		// Replace the Primary() method (around line 477)
+		// This fixes multi-line list parsing with comments
 		// ============================================
-
 		private Expr Primary()
 		{
 			if (Match(TokenType.TRUE)) return new LiteralExpr(true);
@@ -593,6 +593,9 @@ namespace LoopLanguage
 			if (Match(TokenType.LEFT_PAREN))
 			{
 				// Could be grouped expression or tuple
+				// Skip indentation tokens (Python ignores indentation inside parentheses)
+				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
+
 				if (Match(TokenType.RIGHT_PAREN))
 				{
 					return new TupleExpr(new List<Expr>());
@@ -609,17 +612,24 @@ namespace LoopLanguage
 					{
 						do
 						{
-							// Skip newlines inside tuples (for multi-line tuples)
-							while (Match(TokenType.NEWLINE)) { }
+							// Skip newlines and indentation inside tuples
+							// Python ignores indentation inside parentheses
+							while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 							if (Check(TokenType.RIGHT_PAREN)) break;
 							elements.Add(Expression());
 						} while (Match(TokenType.COMMA));
 					}
 
+					// Skip indentation before closing paren
+					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
+
 					Consume(TokenType.RIGHT_PAREN, "Expected ')' after tuple");
 					return new TupleExpr(elements);
 				}
+
+				// Skip indentation before closing paren
+				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 				Consume(TokenType.RIGHT_PAREN, "Expected ')' after expression");
 				return Postfix(first);
@@ -629,8 +639,9 @@ namespace LoopLanguage
 			{
 				// List or list comprehension
 
-				// Skip newlines after opening bracket (for multi-line lists)
-				while (Match(TokenType.NEWLINE)) { }
+				// Skip newlines and indentation tokens after opening bracket
+				// (Python ignores indentation inside brackets)
+				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 				if (Match(TokenType.RIGHT_BRACKET))
 				{
@@ -653,6 +664,9 @@ namespace LoopLanguage
 						condition = LogicalOr();
 					}
 
+					// Skip indentation before closing bracket
+					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
+
 					Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list comprehension");
 					return new ListCompExpr(first, variable.Lexeme, iterable, condition);
 				}
@@ -662,15 +676,16 @@ namespace LoopLanguage
 
 				while (Match(TokenType.COMMA))
 				{
-					// Skip newlines after comma (for multi-line lists)
-					while (Match(TokenType.NEWLINE)) { }
+					// Skip newlines and indentation after comma (for multi-line lists)
+					// Python ignores indentation inside brackets
+					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 					if (Check(TokenType.RIGHT_BRACKET)) break;
 					elements.Add(Expression());
 				}
 
-				// Skip newlines before closing bracket
-				while (Match(TokenType.NEWLINE)) { }
+				// Skip newlines and indentation before closing bracket
+				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 				Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list");
 				return new ListExpr(elements);

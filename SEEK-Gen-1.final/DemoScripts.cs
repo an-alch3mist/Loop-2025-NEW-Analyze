@@ -646,6 +646,7 @@ print('Complex logic test complete')
         {
             // Combine with ComprehensiveTestSuite
             var originalTests = new List<string>(ALL_TESTS);
+			// originalTests.Clear();
             var extendedTests = new List<string>(ComprehensiveTestSuite.ALL_EXTENDED_TESTS);
             var combined = new List<string>();
             combined.AddRange(originalTests);
