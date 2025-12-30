@@ -256,10 +256,8 @@ e
 [TEST 36] ✓ PASSED: Full integration test
 
 [TEST 37] Running: Complex game logic
-[TEST 37] ✗ FAILED: Complex game logic
-
-rror: Parse error at line 7: Parse error at line 7: Expected ')' after arguments at line 7, got '
-'
+Complex logic test complete
+[TEST 37] ✓ PASSED: Complex game logic
 
 [TEST 38] Running: sleep() with integer argument
 Before sleep
@@ -508,7 +506,7 @@ rror: Parse error at line 5: Parse error at line 5: Parse error at line 5: Expec
 [TEST 69] Running: Spiral harvest pattern
 [TEST 69] ✗ FAILED: Spiral harvest pattern
 
-rror: Parse error at line 7: Parse error at line 7: Expected ')' after arguments at line 7, got '
+rror: Parse error at line 7: Parse error at line 7: Expected indented block after for at line 8, got '
 '
 
 [TEST 70] Running: Resource management logic
@@ -530,4 +528,106 @@ Error: Parse error at line 3: Expected newline at line 3
 [TEST 73] Running: Invalid direction should error
 [TEST 73] ✗ FAILED: Invalid direction should error
 Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 74] Running: Using item when not enough in inventory
+[TEST 74] ✗ FAILED: Using item when not enough in inventory
+Error: Parse error at line 7: Expected newline at line 7
+
+[TEST 75] Running: Planting with invalid entity
+[TEST 75] ✗ FAILED: Planting with invalid entity
+Error: Parse error at line 3: Expected newline at line 3
+
+[TEST 76] Running: Many instant function calls (should be fast)
+Completed 4000 instant function calls
+[TEST 76] ✓ PASSED: Many instant function calls (should be fast)
+
+[TEST 77] Running: Performance with mixed operations
+[TEST 77] ✗ FAILED: Performance with mixed operations
+
+rror: Parse error at line 6: Expected indented block after for at line 7, got '
+'
+
+[TEST 78] Running: Lambda functions using game queries
+Position: [0, 0]
+Moved to (1, 0)
+Position: [1, 0]
+Moved to (2, 0)
+Position: [2, 0]
+Moved to (3, 0)
+All positions: [[0, 0], [1, 0], [2, 0]]
+[TEST 78] ✓ PASSED: Lambda functions using game queries
+
+[TEST 79] Running: Sort entities by distance from origin
+[TEST 79] ✗ FAILED: Sort entities by distance from origin
+Error: Parse error at line 3: Unexpected token: 
+
+
+[TEST 80] Running: Complete game simulation
+=== GAME SIMULATION START ===
+Starting position: 0 0
+Starting inventory: 0
+Moved to (0, 0)
+Moved, ground type: soil
+Moved to (1, 0)
+Moved, ground type: soil
+Moved to (1, 1)
+Moved, ground type: soil
+Moved to (0, 1)
+Moved, ground type: soil
+--- Farming Phase ---
+Tilled ground
+Planted carrot at (0, 1)
+Harvested! Hay count: 1
+Harvested! Carrots: 0
+--- Resource Check ---
+Water: 50 Power: 100
+--- Complex Logic ---
+Center: 5 5
+Current: 0 1
+Has hay: True
+Has water: True
+=== GAME SIMULATION END ===
+[TEST 80] ✓ PASSED: Complete game simulation
+
+[TEST 81] Running: Python-style number equality
+PASS: 1 == 1.0 is True
+PASS: 10/2 == 5 is True
+[TEST 81] ✓ PASSED: Python-style number equality
+
+[TEST 82] Running: List indexing requires integers (not floats)
+[TEST 82] ✗ FAILED: List indexing requires integers (not floats)
+Error: Parse error at line 13: Expected newline at line 13
+
+[TEST 83] Running: range() requires integers
+[TEST 83] ✗ FAILED: range() requires integers
+Error: Parse error at line 12: Expected newline at line 12
+
+[TEST 84] Running: Slicing requires integer indices
+[TEST 84] ✗ FAILED: Slicing requires integer indices
+Error: Parse error at line 9: Expected newline at line 9
+
+[TEST 85] Running: Number display (Python format)
+1
+1.5
+2
+5
+3.33333333333333
+[TEST 85] ✓ PASSED: Number display (Python format)
+
+[TEST 86] Running: Mixed int/float arithmetic (Python behavior)
+7.5
+2.5
+12.5
+2
+True
+False
+True
+[TEST 86] ✓ PASSED: Mixed int/float arithmetic (Python behavior)
+========================================
+TEST SUITE COMPLETE
+Tests Run: 86
+Passed: 72
+Failed: 14
+Success Rate: 83.7%
+========================================
 

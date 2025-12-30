@@ -15,6 +15,7 @@ namespace LoopLanguage
         [Header("Test Configuration")]
         [SerializeField] private bool runOnStart = false;
         [SerializeField] private float delayBetweenTests = 0.1f;
+		[SerializeField] CoroutineRunner _coroutineRunner;
         
         #endregion
         
@@ -29,7 +30,6 @@ namespace LoopLanguage
 
 		#region Unity Lifecycle
 
-		[SerializeField] CoroutineRunner _coroutineRunner;
         private void Start()
         {
 			if (this._coroutineRunner == null)

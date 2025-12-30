@@ -16,6 +16,8 @@ namespace LoopLanguage
         private ConsoleManager console;
         private Coroutine currentExecution;
 
+		[Header("Console Manager")]
+		[SerializeField] ConsoleManager _consoleManager;
 		[Header("Error Display")]
 		[SerializeField] private bool showErrorsInUnityConsole = true;  // Toggle in Inspector
 		#endregion
@@ -26,8 +28,8 @@ namespace LoopLanguage
 		private void Awake()
 		{
 			gameBuiltins = new GameBuiltinMethods();
-			console = GetComponent<ConsoleManager>();
 
+			console = (this._consoleManager == null) ? GetComponent<ConsoleManager>() : this._consoleManager;
 			if (console == null)
 			{
 				Debug.LogError("ConsoleManager not found! Add ConsoleManager component.");
@@ -54,7 +56,7 @@ namespace LoopLanguage
             
             // Reset interpreter state
             interpreter.Reset();
-            console?.Clear();
+            console.Clear();
             
             // Start new execution
             currentExecution = StartCoroutine(ExecuteCode(sourceCode));
@@ -69,7 +71,7 @@ namespace LoopLanguage
             {
                 StopCoroutine(currentExecution);
                 currentExecution = null;
-                console?.WriteLine("[Execution stopped]");
+                console.WriteLine("<color=#cc8800> [Execution stopped]</color>");
             }
         }
 
@@ -205,16 +207,12 @@ namespace LoopLanguage
 					Debug.LogError($"{executionErrorType}: {executionErrorMessage}");
 
 					if (console != null)
-					{
-						console.WriteLine(fullError);
-					}
+						console.WriteLine(fullError, isError: true);
 				}
 				else
 				{
 					if (console != null)
-					{
-						console.WriteLine("[Execution complete]");
-					}
+						console.WriteLine("<color=#88cc00>[Execution complete]</color>");
 				}
 			}
 

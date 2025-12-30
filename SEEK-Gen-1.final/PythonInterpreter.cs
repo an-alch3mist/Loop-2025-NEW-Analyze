@@ -1184,9 +1184,33 @@ namespace LoopLanguage
 
 			IEnumerator routine = ExecuteStatement(stmt);
 
+			// ★ FIX: Execute non-yielding statements immediately
 			if (routine != null)
 			{
-				return routine;
+				// Try to execute it - if it completes without yielding, we're done
+				bool hasMore = true;
+				while (hasMore)
+				{
+					try
+					{
+						hasMore = routine.MoveNext();
+					}
+					catch
+					{
+						throw;
+					}
+
+					// If it yielded something, return the routine for async handling
+					if (routine.Current != null)
+					{
+						return routine;
+					}
+
+					if (!hasMore) break;
+				}
+
+				// Completed without yielding
+				return null;
 			}
 
 			return null;

@@ -14,6 +14,7 @@ namespace LoopLanguage
         
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI consoleText;
+		[SerializeField] private Button copyButton;
         [SerializeField] private ScrollRect scrollRect;
         [SerializeField] private int maxLines = 1000;
         
@@ -38,6 +39,14 @@ namespace LoopLanguage
             Clear();
         }
 
+		private void Start()
+		{
+			this.copyButton.onClick.AddListener(() =>
+			{
+				Debug.Log("copied console text to clipBoard");
+				GUIUtility.systemCopyBuffer = this.consoleContent;
+			});
+		}
 		#endregion
 
 		#region Public Methods
@@ -71,7 +80,8 @@ namespace LoopLanguage
 		/// <summary>
 		/// Writes text without newline
 		/// </summary>
-		public void Write(string message)
+		/// not required for now
+		private void Write(string message)
         {
             consoleContent += message;
             UpdateDisplay();

@@ -650,6 +650,9 @@ namespace LoopLanguage
 
 				Expr first = Expression();
 
+				// ★ FIX: Skip whitespace after first element
+				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
+
 				// Check for list comprehension
 				if (Match(TokenType.FOR))
 				{
@@ -681,7 +684,11 @@ namespace LoopLanguage
 					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 					if (Check(TokenType.RIGHT_BRACKET)) break;
+
 					elements.Add(Expression());
+
+					// ★ FIX: Skip whitespace after each element
+					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 				}
 
 				// Skip newlines and indentation before closing bracket
