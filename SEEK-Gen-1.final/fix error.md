@@ -145,9 +145,4 @@ list = [
 
   
 ```
-do an indepth desearch on dictionary, list in python 3 syntax and make sure these errors are fixed.
-
-```output
-<color=red>[PARSER ERROR] Parse error at line 3: Unexpected token: 
-</color>
-```
+do an indepth research on list, dictionary parsing in python 3 syntax and make sure these errors are fixed.
