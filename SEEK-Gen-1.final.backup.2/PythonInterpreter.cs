@@ -141,6 +141,7 @@ namespace LoopLanguage
 		private IEnumerator ExecuteStatement(Stmt stmt)
 		{
 			IncrementInstructionCount();
+			currentLineNumber++;  // Track line for error reporting
 
 			if (stmt is ExpressionStmt)
 			{
@@ -150,16 +151,9 @@ namespace LoopLanguage
 				if (result is IEnumerator)
 				{
 					IEnumerator routine = (IEnumerator)result;
-					// ★ FIXED: Execute and discard FunctionReturn wrapper
 					while (routine.MoveNext())
 					{
-						object current = routine.Current;
-						if (current is FunctionReturn)
-						{
-							// Function returned, but we're in expression statement so discard value
-							break;
-						}
-						yield return current;
+						yield return routine.Current;
 					}
 				}
 			}
@@ -258,11 +252,6 @@ namespace LoopLanguage
 
 		#region Assignment Execution
 
-		// ============================================
-		// ★ STEP 5: Update ExecuteAssignment to extract FunctionReturn
-		// Find ExecuteAssignment method (around line 160) and replace this section:
-		// ============================================
-
 		private IEnumerator ExecuteAssignment(AssignmentStmt stmt)
 		{
 			object value = Evaluate(stmt.Value);
@@ -274,23 +263,14 @@ namespace LoopLanguage
 
 				while (routine.MoveNext())
 				{
-					object current = routine.Current;
-
-					// ★ FIXED: Check for FunctionReturn wrapper
-					if (current is FunctionReturn)
-					{
-						lastValue = ((FunctionReturn)current).Value;
-						break; // Don't yield FunctionReturn to Unity
-					}
-
-					lastValue = current;
-					yield return current;
+					lastValue = routine.Current;
+					yield return routine.Current;
 				}
 
 				value = lastValue;
 			}
 
-			// ... rest of assignment logic unchanged ...
+			// Apply compound assignment operators
 			if (stmt.Operator == "=")
 			{
 				if (globalVariables.Contains(stmt.Target))
@@ -364,14 +344,14 @@ namespace LoopLanguage
 				{
 					if (!dict.ContainsKey(index))
 					{
-						throw new RuntimeError($"Key not found: {index}");
+						throw new RuntimeError(currentLineNumber, $"Key not found: {index}");
 					}
 					dict[index] = ApplyCompoundOperator(dict[index], value, stmt.Operator);
 				}
 			}
 			else
 			{
-				throw new RuntimeError("Can only assign to list or dict subscript");
+				throw new RuntimeError(currentLineNumber, "Can only assign to list or dict subscript");
 			}
 		}
 
@@ -411,7 +391,7 @@ namespace LoopLanguage
 			}
 			else
 			{
-				throw new RuntimeError("Can only assign to class instance member");
+				throw new RuntimeError(currentLineNumber, "Can only assign to class instance member");
 			}
 		}
 
@@ -688,7 +668,16 @@ namespace LoopLanguage
 
 			if (expr is VariableExpr)
 			{
-				return currentScope.Get(((VariableExpr)expr).Name);
+				try
+				{
+					return currentScope.Get(((VariableExpr)expr).Name);
+				}
+				catch (RuntimeError e)
+				{
+					if (e.LineNumber == -1)
+						throw new RuntimeError(currentLineNumber, e.Message);
+					throw;
+				}
 			}
 
 			if (expr is BinaryExpr)
@@ -751,7 +740,7 @@ namespace LoopLanguage
 				return EvaluateConditional((ConditionalExpr)expr);
 			}
 
-			throw new RuntimeError("Unknown expression type");
+			throw new RuntimeError(currentLineNumber, "Unknown expression type");
 		}
 
 		private object EvaluateBinary(BinaryExpr expr)
@@ -805,13 +794,14 @@ namespace LoopLanguage
 					return str.Contains(search);
 				}
 
+				// Check if it's a dictionary
 				if (rightValue is Dictionary<object, object>)
 				{
 					Dictionary<object, object> dict = (Dictionary<object, object>)rightValue;
 					return dict.ContainsKey(leftValue);
 				}
 
-				throw new RuntimeError("'in' requires list, string, or dict");
+				throw new RuntimeError(currentLineNumber, "'in' requires list, string, or dict");
 			}
 
 			// Handle 'is' operator
@@ -861,7 +851,7 @@ namespace LoopLanguage
 				case TokenType.RIGHT_SHIFT: return (double)((int)leftNum >> (int)rightNum);
 
 				default:
-					throw new RuntimeError($"Unknown binary operator: {expr.Operator}");
+					throw new RuntimeError(currentLineNumber, $"Unknown binary operator: {expr.Operator}");
 			}
 		}
 
@@ -881,13 +871,14 @@ namespace LoopLanguage
 					return (double)(~(int)ToNumber(operand));
 
 				default:
-					throw new RuntimeError($"Unknown unary operator: {expr.Operator}");
+					throw new RuntimeError(currentLineNumber, $"Unknown unary operator: {expr.Operator}");
 			}
 		}
 
 		// ============================================
-		// CRITICAL FIX: EvaluateCall must execute async arguments
-		// Replace the entire EvaluateCall method in PythonInterpreter.cs
+		// FILE: PythonInterpreter.cs
+		// Replace EvaluateCall() method (around line 568)
+		// This adds support for BoundListMethod with keyword arguments
 		// ============================================
 
 		private object EvaluateCall(CallExpr expr)
@@ -896,165 +887,18 @@ namespace LoopLanguage
 
 			// Evaluate positional arguments
 			List<object> arguments = new List<object>();
-			bool hasAsyncArgs = false;
-
 			foreach (Expr arg in expr.Arguments)
 			{
-				object argValue = Evaluate(arg);
-				arguments.Add(argValue);
-
-				// Check if any argument is an IEnumerator (async function result)
-				if (argValue is IEnumerator)
-				{
-					hasAsyncArgs = true;
-				}
+				arguments.Add(Evaluate(arg));
 			}
 
 			// Evaluate keyword arguments
 			Dictionary<string, object> kwargs = new Dictionary<string, object>();
 			foreach (var kvp in expr.KeywordArguments)
 			{
-				object kwValue = Evaluate(kvp.Value);
-				kwargs[kvp.Key] = kwValue;
-
-				if (kwValue is IEnumerator)
-				{
-					hasAsyncArgs = true;
-				}
+				kwargs[kvp.Key] = Evaluate(kvp.Value);
 			}
 
-			// ★ CRITICAL FIX: If any arguments are IEnumerators, we need to execute them first
-			// Return an IEnumerator that executes all async arguments, then calls the function
-			if (hasAsyncArgs)
-			{
-				return ExecuteCallWithAsyncArgs(callee, arguments, kwargs);
-			}
-
-			// No async arguments - proceed with normal synchronous call
-			return ExecuteCallSync(callee, arguments, kwargs);
-		}
-
-		// ============================================
-		// NEW METHOD: Execute arguments that are IEnumerators
-		// Add this method right after EvaluateCall
-		// ============================================
-
-		/// <summary>
-		/// Executes a call where one or more arguments are IEnumerators (async function results)
-		/// Returns an IEnumerator that first executes all async arguments, then calls the function
-		/// </summary>
-		private IEnumerator ExecuteCallWithAsyncArgs(object callee, List<object> arguments, Dictionary<string, object> kwargs)
-		{
-			// First, execute any IEnumerator arguments and extract their return values
-			List<object> resolvedArgs = new List<object>();
-
-			foreach (object arg in arguments)
-			{
-				if (arg is IEnumerator)
-				{
-					IEnumerator routine = (IEnumerator)arg;
-					object resolvedValue = null;
-
-					while (routine.MoveNext())
-					{
-						object current = routine.Current;
-
-						// ★ Extract FunctionReturn wrapper
-						if (current is FunctionReturn)
-						{
-							resolvedValue = ((FunctionReturn)current).Value;
-							break;
-						}
-
-						resolvedValue = current;
-						yield return current; // Yield animations/waits to Unity
-					}
-
-					resolvedArgs.Add(resolvedValue);
-				}
-				else
-				{
-					resolvedArgs.Add(arg);
-				}
-			}
-
-			// Resolve keyword arguments
-			Dictionary<string, object> resolvedKwargs = new Dictionary<string, object>();
-			foreach (var kvp in kwargs)
-			{
-				if (kvp.Value is IEnumerator)
-				{
-					IEnumerator routine = (IEnumerator)kvp.Value;
-					object resolvedValue = null;
-
-					while (routine.MoveNext())
-					{
-						object current = routine.Current;
-
-						if (current is FunctionReturn)
-						{
-							resolvedValue = ((FunctionReturn)current).Value;
-							break;
-						}
-
-						resolvedValue = current;
-						yield return current;
-					}
-
-					resolvedKwargs[kvp.Key] = resolvedValue;
-				}
-				else
-				{
-					resolvedKwargs[kvp.Key] = kvp.Value;
-				}
-			}
-
-			// Now call the function with resolved arguments
-			object result = ExecuteCallSync(callee, resolvedArgs, resolvedKwargs);
-
-			// If the function itself is async, execute it
-			if (result is IEnumerator)
-			{
-				IEnumerator resultRoutine = (IEnumerator)result;
-				object finalResult = null;
-
-				while (resultRoutine.MoveNext())
-				{
-					object current = resultRoutine.Current;
-
-					if (current is FunctionReturn)
-					{
-						finalResult = ((FunctionReturn)current).Value;
-						// ★ Yield the FunctionReturn so calling code can extract it
-						yield return current;
-						yield break;
-					}
-
-					finalResult = current;
-					yield return current;
-				}
-
-				// If no FunctionReturn was yielded, yield one now
-				yield return new FunctionReturn(finalResult);
-			}
-			else
-			{
-				// Sync result - wrap in FunctionReturn
-				yield return new FunctionReturn(result);
-			}
-		}
-
-		// ============================================
-		// NEW METHOD: Execute synchronous call
-		// Add this method right after ExecuteCallWithAsyncArgs
-		// ============================================
-
-		/// <summary>
-		/// Executes a function call with resolved (non-IEnumerator) arguments
-		/// This is the core call logic extracted from the original EvaluateCall
-		/// </summary>
-		private object ExecuteCallSync(object callee, List<object> arguments, Dictionary<string, object> kwargs)
-		{
 			// Built-in function call
 			if (callee is BuiltinFunction)
 			{
@@ -1109,7 +953,7 @@ namespace LoopLanguage
 				return CreateClassInstance(classMethods, arguments);
 			}
 
-			throw new RuntimeError("Can only call functions and classes");
+			throw new RuntimeError(currentLineNumber, "Can only call functions and classes");
 		}
 
 		// ============================================
@@ -1253,22 +1097,66 @@ namespace LoopLanguage
 			if (keyFunc != null)
 			{
 				// Sort with lambda key function
-				list.Sort((a, b) => {
-					object keyA = keyFunc.Call(this, new List<object> { a });
-					object keyB = keyFunc.Call(this, new List<object> { b });
-					int comparison = CompareObjects(keyA, keyB);
-					return reverse ? -comparison : comparison;
-				});
+				try
+				{
+					list.Sort((a, b) => {
+						try
+						{
+							object keyA = keyFunc.Call(this, new List<object> { a });
+							object keyB = keyFunc.Call(this, new List<object> { b });
+							int comparison = CompareObjects(keyA, keyB);
+							return reverse ? -comparison : comparison;
+						}
+						catch (RuntimeError)
+						{
+							throw;
+						}
+						catch (Exception innerEx)
+						{
+							throw new RuntimeError("sort() key function failed: " + innerEx.Message);
+						}
+					});
+				}
+				catch (RuntimeError)
+				{
+					throw;
+				}
+				catch (Exception e)
+				{
+					throw new RuntimeError("sort() failed: " + e.Message);
+				}
 			}
 			else if (keyFuncDef != null)
 			{
 				// Sort with user-defined key function
-				list.Sort((a, b) => {
-					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
-					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
-					int comparison = CompareObjects(keyA, keyB);
-					return reverse ? -comparison : comparison;
-				});
+				try
+				{
+					list.Sort((a, b) => {
+						try
+						{
+							object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
+							object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
+							int comparison = CompareObjects(keyA, keyB);
+							return reverse ? -comparison : comparison;
+						}
+						catch (RuntimeError)
+						{
+							throw;
+						}
+						catch (Exception innerEx)
+						{
+							throw new RuntimeError("sort() key function failed: " + innerEx.Message);
+						}
+					});
+				}
+				catch (RuntimeError)
+				{
+					throw;
+				}
+				catch (Exception e)
+				{
+					throw new RuntimeError("sort() failed: " + e.Message);
+				}
 			}
 			else
 			{
@@ -1321,22 +1209,19 @@ namespace LoopLanguage
 
 			try
 			{
-				for (int stmtIndex = 0; stmtIndex < func.Body.Count; stmtIndex++)
+				foreach (Stmt stmt in func.Body)
 				{
-					Stmt stmt = func.Body[stmtIndex];
 					object result = ExecuteStatementSync(stmt);
 
 					if (result is IEnumerator)
 					{
-						// Found async statement - execute entire function as coroutine
 						recursionDepth--;
-						currentScope = previousScope;
-						return ExecuteFunctionBodyAsync(func, functionScope, previousScope, arguments, instance, stmtIndex);
+						return result;
 					}
 				}
 
 				recursionDepth--;
-				return null; // ★ No explicit return, function returns None
+				return null;
 			}
 			catch (ReturnException e)
 			{
@@ -1349,6 +1234,7 @@ namespace LoopLanguage
 				currentScope = previousScope;
 			}
 		}
+
 		private object ExecuteStatementSync(Stmt stmt)
 		{
 			if (stmt is ReturnStmt)
@@ -1390,83 +1276,6 @@ namespace LoopLanguage
 
 			return null;
 		}
-		// ============================================
-		// ★ STEP 4: Modify ExecuteFunctionBodyAsync (around line 710)
-		// Replace the entire method with this version:
-		// ============================================
-
-		private IEnumerator ExecuteFunctionBodyAsync(FunctionDefStmt func, Scope functionScope, Scope previousScope, List<object> arguments, ClassInstance instance, int startIndex = 0)
-		{
-			currentScope = functionScope;
-			recursionDepth++;
-
-			object returnValue = null; // ★ Track return value
-			bool hasReturned = false;
-
-			for (int stmtIndex = startIndex; stmtIndex < func.Body.Count; stmtIndex++)
-			{
-				Stmt stmt = func.Body[stmtIndex];
-				IEnumerator routine = null;
-				bool shouldReturn = false;
-
-				try
-				{
-					routine = ExecuteStatement(stmt);
-				}
-				catch (ReturnException e)
-				{
-					returnValue = e.Value;
-					hasReturned = true;
-					shouldReturn = true;
-				}
-
-				if (shouldReturn)
-				{
-					break;
-				}
-
-				if (routine != null)
-				{
-					while (true)
-					{
-						bool hasMore = false;
-						bool returnCaught = false;
-
-						try
-						{
-							hasMore = routine.MoveNext();
-						}
-						catch (ReturnException e)
-						{
-							returnValue = e.Value;
-							hasReturned = true;
-							returnCaught = true;
-						}
-
-						if (returnCaught)
-						{
-							break;
-						}
-
-						if (!hasMore) break;
-
-						yield return routine.Current;
-					}
-
-					if (hasReturned)
-					{
-						break;
-					}
-				}
-			}
-
-			// ★ CRITICAL FIX: Yield the return value wrapped in FunctionReturn
-			// This allows calling code to extract it
-			yield return new FunctionReturn(returnValue);
-
-			recursionDepth--;
-			currentScope = previousScope;
-		}
 
 		private object CreateClassInstance(Dictionary<string, FunctionDefStmt> classMethods, List<object> arguments)
 		{
@@ -1504,12 +1313,12 @@ namespace LoopLanguage
 				Dictionary<object, object> dict = (Dictionary<object, object>)obj;
 				if (!dict.ContainsKey(index))
 				{
-					throw new RuntimeError($"Key not found: {index}");
+					throw new RuntimeError(currentLineNumber, $"Key not found: {index}");
 				}
 				return dict[index];
 			}
 
-			throw new RuntimeError("Can only index lists, strings, and dicts");
+			throw new RuntimeError(currentLineNumber, "Can only index lists, strings, and dicts");
 		}
 
 		private object EvaluateSlice(SliceExpr expr)
@@ -1887,13 +1696,6 @@ namespace LoopLanguage
 				Interpreter = interpreter;
 			}
 		}
-
-		// ★ NEW: Wrapper to communicate function return values through coroutines
-		private class FunctionReturn
-		{
-			public object Value;
-			public FunctionReturn(object value) { Value = value; }
-		}
 		#endregion
 
 		#region Helper Methods
@@ -1932,12 +1734,32 @@ namespace LoopLanguage
 
 		private double ToNumber(object value)
 		{
-			return NumberHandling.ToNumber(value);
+			try
+			{
+				return NumberHandling.ToNumber(value);
+			}
+			catch (RuntimeError e)
+			{
+				// Add line number if not present
+				if (e.LineNumber == -1)
+					throw new RuntimeError(currentLineNumber, e.Message);
+				throw;
+			}
 		}
 
 		private int ToInt(object value)
 		{
-			return NumberHandling.ToInteger(value, "Conversion");
+			try
+			{
+				return NumberHandling.ToInteger(value, "Conversion");
+			}
+			catch (RuntimeError e)
+			{
+				// Add line number if not present
+				if (e.LineNumber == -1)
+					throw new RuntimeError(currentLineNumber, e.Message);
+				throw;
+			}
 		}
 
 		private string ToString(object value)
@@ -2018,69 +1840,6 @@ namespace LoopLanguage
 			throw new RuntimeError("Object is not iterable");
 		}
 
-		// ============================================
-		// ★ STEP 3: Add CallUserFunctionSync helper method
-		// Add this new method after CallUserFunction:
-		// ============================================
-
-		/// <summary>
-		/// Synchronous version for use in callbacks (like sort key functions)
-		/// Throws error if async operations detected
-		/// </summary>
-		private object CallUserFunctionSync(FunctionDefStmt func, List<object> arguments, ClassInstance instance)
-		{
-			if (arguments.Count != func.Parameters.Count)
-			{
-				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {arguments.Count}");
-			}
-
-			recursionDepth++;
-			if (recursionDepth > MAX_RECURSION_DEPTH)
-			{
-				throw new RuntimeError("Maximum recursion depth exceeded");
-			}
-
-			Scope functionScope = new Scope(currentScope);
-
-			if (instance != null)
-			{
-				functionScope.Define("self", instance);
-			}
-
-			for (int i = 0; i < func.Parameters.Count; i++)
-			{
-				functionScope.Define(func.Parameters[i], arguments[i]);
-			}
-
-			Scope previousScope = currentScope;
-			currentScope = functionScope;
-
-			try
-			{
-				foreach (Stmt stmt in func.Body)
-				{
-					object result = ExecuteStatementSync(stmt);
-
-					if (result is IEnumerator)
-					{
-						throw new RuntimeError("Cannot use sleep() or animation functions inside comparison/key functions");
-					}
-				}
-
-				recursionDepth--;
-				return null;
-			}
-			catch (ReturnException e)
-			{
-				recursionDepth--;
-				currentScope = previousScope;
-				return e.Value;
-			}
-			finally
-			{
-				currentScope = previousScope;
-			}
-		}
 		#endregion
 
 		#region Built-in Functions

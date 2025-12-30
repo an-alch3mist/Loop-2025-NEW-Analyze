@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -324,9 +324,7 @@ namespace LoopLanguage
             
             return (x + y) % 2 == 1;
         }
-
-		#endregion
-
-		
-	}
+        
+        #endregion
+    }
 }
