@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-
 namespace LoopLanguage
 {
     /// <summary>
@@ -39,6 +38,7 @@ namespace LoopLanguage
         #endregion
         
         #region Time Budget Dependent Functions (IEnumerator)
+        
         /// <summary>
         /// Moves player one tile in specified direction
         /// </summary>
@@ -82,188 +82,11 @@ namespace LoopLanguage
             // Simulate movement animation time
             yield return new WaitForSeconds(0.3f);
         }
-
-		/// <summary>
-		/// Moves player one tile in specified direction
-		/// </summary>
-		public IEnumerator Walk(List<object> args)
-		{
-			if (args.Count != 2)
-			{
-				throw new RuntimeError("walk() accepts just 2 argument");
-			}
-
-			string argX = args[0].ToString().ToLower();
-			string argY = args[1].ToString().ToLower();
-			if (float.TryParse(argX, out float distX) && float.TryParse(argY, out float distY))
-			{
-				int distXInt = Mathf.RoundToInt(distX);
-				int distYInt = Mathf.RoundToInt(distY);
-				if (true)
-				{
-					float duration = 0.28f;
-					Transform transform = SPACE_GAME.GameStore.playerData.playerObj.transform;
-					Vector3 dir = new Vector3(distXInt, distYInt, 0f).normalized;
-					#region without squish
-					/*
-					Vector3 curr = transform.position;
-					Vector3 next = curr + Vector3.right * dist;
-					Vector3 scale = transform.localScale;
-					for (float time = 0; time < duration; time += Time.deltaTime)
-					{
-						float t = time * 1f / duration;
-						// Debug.Log($"t: {t}");
-						Vector3 lerp = curr + (next - curr) * t;
-						transform.position = lerp;
-						yield return new WaitForEndOfFrame();
-						// yield return null; // won't animate will run entire iteration in one go
-					}
-					transform.position = next;
-					*/ 
-					#endregion
-					yield return MoveWithSquash(
-						transform: transform, 
-						direction: dir, 
-						dist: Vector3.Magnitude(new Vector3(distXInt, distYInt, 0f)), 
-						duration: duration, 
-						maxStretch: 1.25f);
-				}
-			}
-			else
-			{
-				throw new RuntimeError("one of argument inside walk() is not of type number");
-			}
-			#region move aproach reference
-			/*
-				string direction = args[0].ToString().ToLower();
-
-				switch (direction)
-				{
-					case "up":
-					case "north":
-						playerPosition.y--;
-						break;
-					case "down":
-					case "south":
-						playerPosition.y++;
-						break;
-					case "left":
-					case "west":
-						playerPosition.x--;
-						break;
-					case "right":
-					case "east":
-						playerPosition.x++;
-						break;
-					default:
-						throw new RuntimeError($"Invalid direction: {direction}");
-				}
-
-				// Clamp to world bounds
-				playerPosition.x = Mathf.Clamp(playerPosition.x, 0, worldSize - 1);
-				playerPosition.y = Mathf.Clamp(playerPosition.y, 0, worldSize - 1);
-
-				Debug.Log($"Moved to ({playerPosition.x}, {playerPosition.y})");
-
-				// Simulate movement animation time
-				yield return new WaitForSeconds(0.3f);
-				*/
-			#endregion
-		}
-		#region Util Walk
-		/// <summary>
-		/// Move transform by (direction.normalized * dist) over duration while applying squash & stretch.
-		/// </summary>
-		private static IEnumerator MoveWithSquash(
-			Transform transform, 
-			Vector3 direction, 
-			float dist, float duration, float maxStretch = 1.25f, 
-			bool useWaitForEndOfFrame = true) // since, yield return null shall exec loop in one go, without animating
-		{
-			if (transform == null) yield break;
-			if (dist == 0f || duration <= 0f)
-			{
-				yield break;
-			}
-
-			Vector3 start = transform.position;
-			Vector3 moveDir = direction.normalized;
-			Vector3 target = start + moveDir * dist;
-
-			Vector3 originalLocalScale = Vector3.one;
-
-			// choose the dominant local axis (x=0,y=1,z=2) for stretching
-			// convert world move direction to local space so stretch follows object's local axes
-			Vector3 localDir = transform.InverseTransformDirection(moveDir);
-			int GetDominantAxis(Vector3 v)
-			{
-				Vector3 a = new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
-				if (a.x >= a.y && a.x >= a.z) return 0;
-				if (a.y >= a.x && a.y >= a.z) return 1;
-				return 2;
-			}
-			int dominantAxis = GetDominantAxis(localDir);
-
-			float time = 0f;
-			while (time < duration)
-			{
-				float dt = Time.deltaTime;
-				time += dt;
-				float tNorm = Mathf.Clamp01(time / duration);
-
-				// position ease (you can choose any curve)
-				float posT = Mathf.SmoothStep(0f, 1f, tNorm);
-				transform.position = Vector3.Lerp(start, target, posT);
-
-				// squash/stretch: peak in middle of motion
-				// peak curve: sin(pi * t) peaks at t=0.5 (value 1)
-				float peak = Mathf.Sin(tNorm * Mathf.PI);
-				float stretch = Mathf.Lerp(1f, maxStretch, peak); // 1 -> maxStretch -> 1
-
-				// apply stretch on dominant local axis, and inverse scale on other two axes for approximate volume preservation
-				Vector3 newLocalScale = Vector3.one;
-
-				if (dominantAxis == 0) // local X dominant
-				{
-					newLocalScale.x = originalLocalScale.x * stretch;
-					float inv = 1f / Mathf.Sqrt(stretch);
-					newLocalScale.y = originalLocalScale.y * inv;
-					newLocalScale.z = originalLocalScale.z * inv;
-				}
-				else if (dominantAxis == 1) // local Y dominant
-				{
-					newLocalScale.y = originalLocalScale.y * stretch;
-					float inv = 1f / Mathf.Sqrt(stretch);
-					newLocalScale.x = originalLocalScale.x * inv;
-					newLocalScale.z = originalLocalScale.z * inv;
-				}
-				else // local Z dominant
-				{
-					newLocalScale.z = originalLocalScale.z * stretch;
-					float inv = 1f / Mathf.Sqrt(stretch);
-					newLocalScale.x = originalLocalScale.x * inv;
-					newLocalScale.y = originalLocalScale.y * inv;
-				}
-
-				transform.localScale = newLocalScale;
-
-				// yield one frame (use WaitForEndOfFrame to be safe with your runner)
-				if (useWaitForEndOfFrame)
-					yield return new WaitForEndOfFrame();
-				else
-					yield return null;
-			}
-
-			// finalize
-			transform.position = target;
-			transform.localScale = originalLocalScale;
-		}
-		#endregion
-
-		/// <summary>
-		/// Harvests entity at current position
-		/// </summary>
-		public IEnumerator Harvest(List<object> args)
+        
+        /// <summary>
+        /// Harvests entity at current position
+        /// </summary>
+        public IEnumerator Harvest(List<object> args)
         {
             if (args.Count != 0)
             {
@@ -351,6 +174,7 @@ namespace LoopLanguage
             
             yield return new WaitForSeconds(1.0f);
         }
+        
         #endregion
         
         #region Time Budget Independent Functions (Instant Return)
@@ -502,6 +326,7 @@ namespace LoopLanguage
         }
 
 		#endregion
+
 		
 	}
 }

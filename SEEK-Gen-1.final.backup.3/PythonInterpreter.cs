@@ -10,6 +10,7 @@ namespace LoopLanguage
 	/// Main interpreter for LOOP Language (Python-like).
 	/// Executes AST using coroutine-based execution with instruction budget.
 	/// 
+	/// FIXED: Proper handling of break/continue exceptions in .NET 2.0
 	/// (.NET 2.0 limitation: cannot use yield return inside try-catch)
 	/// </summary>
 	public class PythonInterpreter
@@ -100,7 +101,6 @@ namespace LoopLanguage
 			globalScope.Define("sorted", new BuiltinFunction("sorted", Sorted));
 
 			globalScope.Define("move", new BuiltinFunction("move", gameBuiltins.Move));
-			globalScope.Define("walk", new BuiltinFunction("walk", gameBuiltins.Walk));
 			globalScope.Define("harvest", new BuiltinFunction("harvest", gameBuiltins.Harvest));
 			globalScope.Define("plant", new BuiltinFunction("plant", gameBuiltins.Plant));
 			globalScope.Define("till", new BuiltinFunction("till", gameBuiltins.Till));
@@ -230,47 +230,7 @@ namespace LoopLanguage
 			}
 			else if (stmt is ReturnStmt)
 			{
-				ReturnStmt returnStmt = (ReturnStmt)stmt;
-
-				if (returnStmt.Value != null)
-				{
-					object returnValue = Evaluate(returnStmt.Value);
-
-					// ★ CRITICAL: If return expression contains async function calls,
-					// execute them first and extract the actual return value
-					if (returnValue is IEnumerator)
-					{
-						IEnumerator routine = (IEnumerator)returnValue;
-						object extractedValue = null;
-
-						while (routine.MoveNext())
-						{
-							object current = routine.Current;
-
-							if (current is FunctionReturn)
-							{
-								extractedValue = ((FunctionReturn)current).Value;
-								break;
-							}
-
-							extractedValue = current;
-							yield return current;
-						}
-
-						// Now throw the exception with the extracted value
-						throw new ReturnException(extractedValue);
-					}
-					else
-					{
-						// Synchronous return value
-						throw new ReturnException(returnValue);
-					}
-				}
-				else
-				{
-					// Return without value (returns None)
-					throw new ReturnException(null);
-				}
+				ExecuteReturn((ReturnStmt)stmt);
 			}
 			else if (stmt is BreakStmt)
 			{
@@ -298,6 +258,10 @@ namespace LoopLanguage
 
 		#region Assignment Execution
 
+		// ============================================
+		// ★ STEP 5: Update ExecuteAssignment to extract FunctionReturn
+		// Find ExecuteAssignment method (around line 160) and replace this section:
+		// ============================================
 
 		private IEnumerator ExecuteAssignment(AssignmentStmt stmt)
 		{
@@ -796,160 +760,30 @@ namespace LoopLanguage
 			if (expr.Operator == TokenType.AND)
 			{
 				object leftVal = Evaluate(expr.Left);
-
-				// ★ FIX: If left operand is async, handle it
-				if (leftVal is IEnumerator)
-				{
-					return EvaluateBinaryAsync(expr, leftVal, null);
-				}
-
 				if (!IsTruthy(leftVal)) return false;
-
 				object rightVal = Evaluate(expr.Right);
-
-				// ★ FIX: If right operand is async, handle it
-				if (rightVal is IEnumerator)
-				{
-					return EvaluateBinaryAsync(expr, leftVal, rightVal);
-				}
-
 				return IsTruthy(rightVal);
 			}
 
 			if (expr.Operator == TokenType.OR)
 			{
 				object leftVal = Evaluate(expr.Left);
-
-				// ★ FIX: If left operand is async, handle it
-				if (leftVal is IEnumerator)
-				{
-					return EvaluateBinaryAsync(expr, leftVal, null);
-				}
-
 				if (IsTruthy(leftVal)) return true;
-
 				object rightVal = Evaluate(expr.Right);
-
-				// ★ FIX: If right operand is async, handle it
-				if (rightVal is IEnumerator)
-				{
-					return EvaluateBinaryAsync(expr, leftVal, rightVal);
-				}
-
 				return IsTruthy(rightVal);
 			}
 
 			object leftValue = Evaluate(expr.Left);
 			object rightValue = Evaluate(expr.Right);
 
-			// ★ FIX: If either operand is an IEnumerator (async function result), 
-			// return an IEnumerator that executes them first
-			if (leftValue is IEnumerator || rightValue is IEnumerator)
-			{
-				return EvaluateBinaryAsync(expr, leftValue, rightValue);
-			}
-
-			// ★ All operands resolved, perform operation synchronously
-			return EvaluateBinarySync(leftValue, rightValue, expr.Operator);
-		}
-
-		/// <summary>
-		/// ★ NEW METHOD: Handles binary operations with IEnumerator operands
-		/// Executes async operands first, then performs the operation
-		/// </summary>
-		private IEnumerator EvaluateBinaryAsync(BinaryExpr expr, object leftValue, object rightValue)
-		{
-			// Resolve left operand if it's an IEnumerator
-			if (leftValue is IEnumerator)
-			{
-				IEnumerator leftRoutine = (IEnumerator)leftValue;
-				object resolvedLeft = null;
-
-				while (leftRoutine.MoveNext())
-				{
-					object current = leftRoutine.Current;
-
-					if (current is FunctionReturn)
-					{
-						resolvedLeft = ((FunctionReturn)current).Value;
-						break;
-					}
-
-					resolvedLeft = current;
-					yield return current;
-				}
-
-				leftValue = resolvedLeft;
-			}
-
-			// For short-circuit operators, check condition after resolving left
-			if (expr.Operator == TokenType.AND)
-			{
-				if (!IsTruthy(leftValue))
-				{
-					yield return new FunctionReturn(false);
-					yield break;
-				}
-			}
-			else if (expr.Operator == TokenType.OR)
-			{
-				if (IsTruthy(leftValue))
-				{
-					yield return new FunctionReturn(true);
-					yield break;
-				}
-			}
-
-			// Need to evaluate right operand for short-circuit operators
-			if (rightValue == null)
-			{
-				rightValue = Evaluate(expr.Right);
-			}
-
-			// Resolve right operand if it's an IEnumerator
-			if (rightValue is IEnumerator)
-			{
-				IEnumerator rightRoutine = (IEnumerator)rightValue;
-				object resolvedRight = null;
-
-				while (rightRoutine.MoveNext())
-				{
-					object current = rightRoutine.Current;
-
-					if (current is FunctionReturn)
-					{
-						resolvedRight = ((FunctionReturn)current).Value;
-						break;
-					}
-
-					resolvedRight = current;
-					yield return current;
-				}
-
-				rightValue = resolvedRight;
-			}
-
-			// Both operands resolved, perform the operation
-			object result = EvaluateBinarySync(leftValue, rightValue, expr.Operator);
-
-			// Wrap result in FunctionReturn so it can be extracted by caller
-			yield return new FunctionReturn(result);
-		}
-
-		/// <summary>
-		/// ★ NEW METHOD: Performs binary operation on resolved (non-IEnumerator) values
-		/// Extracted from original EvaluateBinary for reuse
-		/// </summary>
-		private object EvaluateBinarySync(object leftValue, object rightValue, TokenType op)
-		{
 			// Handle string concatenation
-			if (op == TokenType.PLUS && (leftValue is string || rightValue is string))
+			if (expr.Operator == TokenType.PLUS && (leftValue is string || rightValue is string))
 			{
 				return ToString(leftValue) + ToString(rightValue);
 			}
 
 			// Handle 'in' operator
-			if (op == TokenType.IN)
+			if (expr.Operator == TokenType.IN)
 			{
 				if (rightValue is List<object>)
 				{
@@ -981,31 +815,20 @@ namespace LoopLanguage
 			}
 
 			// Handle 'is' operator
-			if (op == TokenType.IS)
+			if (expr.Operator == TokenType.IS)
 			{
 				return ReferenceEquals(leftValue, rightValue);
 			}
 
 			// Handle equality/inequality (works with any type, no number conversion needed)
-			if (op == TokenType.EQUAL_EQUAL)
+			if (expr.Operator == TokenType.EQUAL_EQUAL)
 			{
 				return AreEqual(leftValue, rightValue);
 			}
 
-			if (op == TokenType.BANG_EQUAL)
+			if (expr.Operator == TokenType.BANG_EQUAL)
 			{
 				return !AreEqual(leftValue, rightValue);
-			}
-
-			// Handle AND/OR (should only reach here for non-short-circuit evaluation)
-			if (op == TokenType.AND)
-			{
-				return IsTruthy(leftValue) && IsTruthy(rightValue);
-			}
-
-			if (op == TokenType.OR)
-			{
-				return IsTruthy(leftValue) || IsTruthy(rightValue);
 			}
 
 			// From here on, we need numeric values
@@ -1013,7 +836,7 @@ namespace LoopLanguage
 			double leftNum = ToNumber(leftValue);
 			double rightNum = ToNumber(rightValue);
 
-			switch (op)
+			switch (expr.Operator)
 			{
 				// Arithmetic operators
 				case TokenType.PLUS: return leftNum + rightNum;
@@ -1038,7 +861,7 @@ namespace LoopLanguage
 				case TokenType.RIGHT_SHIFT: return (double)((int)leftNum >> (int)rightNum);
 
 				default:
-					throw new RuntimeError($"Unknown binary operator: {op}");
+					throw new RuntimeError($"Unknown binary operator: {expr.Operator}");
 			}
 		}
 
@@ -1046,57 +869,7 @@ namespace LoopLanguage
 		{
 			object operand = Evaluate(expr.Operand);
 
-			// ★ FIX: If operand is an IEnumerator (async function result),
-			// return an IEnumerator that executes it first
-			if (operand is IEnumerator)
-			{
-				return EvaluateUnaryAsync(expr, operand);
-			}
-
-			return EvaluateUnarySync(operand, expr.Operator);
-		}
-
-		/// <summary>
-		/// ★ NEW METHOD: Handles unary operations with IEnumerator operands
-		/// </summary>
-		private IEnumerator EvaluateUnaryAsync(UnaryExpr expr, object operandValue)
-		{
-			// Resolve operand if it's an IEnumerator
-			if (operandValue is IEnumerator)
-			{
-				IEnumerator routine = (IEnumerator)operandValue;
-				object resolvedValue = null;
-
-				while (routine.MoveNext())
-				{
-					object current = routine.Current;
-
-					if (current is FunctionReturn)
-					{
-						resolvedValue = ((FunctionReturn)current).Value;
-						break;
-					}
-
-					resolvedValue = current;
-					yield return current;
-				}
-
-				operandValue = resolvedValue;
-			}
-
-			// Perform the operation
-			object result = EvaluateUnarySync(operandValue, expr.Operator);
-
-			// Wrap result in FunctionReturn
-			yield return new FunctionReturn(result);
-		}
-
-		/// <summary>
-		/// ★ NEW METHOD: Performs unary operation on resolved value
-		/// </summary>
-		private object EvaluateUnarySync(object operand, TokenType op)
-		{
-			switch (op)
+			switch (expr.Operator)
 			{
 				case TokenType.MINUS:
 					return -ToNumber(operand);
@@ -1108,10 +881,14 @@ namespace LoopLanguage
 					return (double)(~(int)ToNumber(operand));
 
 				default:
-					throw new RuntimeError($"Unknown unary operator: {op}");
+					throw new RuntimeError($"Unknown unary operator: {expr.Operator}");
 			}
 		}
 
+		// ============================================
+		// CRITICAL FIX: EvaluateCall must execute async arguments
+		// Replace the entire EvaluateCall method in PythonInterpreter.cs
+		// ============================================
 
 		private object EvaluateCall(CallExpr expr)
 		{
@@ -1145,14 +922,22 @@ namespace LoopLanguage
 					hasAsyncArgs = true;
 				}
 			}
+
+			// ★ CRITICAL FIX: If any arguments are IEnumerators, we need to execute them first
+			// Return an IEnumerator that executes all async arguments, then calls the function
 			if (hasAsyncArgs)
 			{
 				return ExecuteCallWithAsyncArgs(callee, arguments, kwargs);
 			}
 
+			// No async arguments - proceed with normal synchronous call
 			return ExecuteCallSync(callee, arguments, kwargs);
 		}
 
+		// ============================================
+		// NEW METHOD: Execute arguments that are IEnumerators
+		// Add this method right after EvaluateCall
+		// ============================================
 
 		/// <summary>
 		/// Executes a call where one or more arguments are IEnumerators (async function results)
@@ -1160,6 +945,7 @@ namespace LoopLanguage
 		/// </summary>
 		private IEnumerator ExecuteCallWithAsyncArgs(object callee, List<object> arguments, Dictionary<string, object> kwargs)
 		{
+			// First, execute any IEnumerator arguments and extract their return values
 			List<object> resolvedArgs = new List<object>();
 
 			foreach (object arg in arguments)
@@ -1223,8 +1009,10 @@ namespace LoopLanguage
 				}
 			}
 
+			// Now call the function with resolved arguments
 			object result = ExecuteCallSync(callee, resolvedArgs, resolvedKwargs);
 
+			// If the function itself is async, execute it
 			if (result is IEnumerator)
 			{
 				IEnumerator resultRoutine = (IEnumerator)result;
@@ -1304,7 +1092,7 @@ namespace LoopLanguage
 			// User-defined function call
 			if (callee is FunctionDefStmt)
 			{
-				return CallUserFunction((FunctionDefStmt)callee, arguments, kwargs, null);
+				return CallUserFunction((FunctionDefStmt)callee, arguments, null);
 			}
 
 			// Lambda function call
@@ -1368,8 +1156,7 @@ namespace LoopLanguage
 
 			if (keyFunc != null)
 			{
-				result.Sort((a, b) =>
-				{
+				result.Sort((a, b) => {
 					object keyA = keyFunc.Call(this, new List<object> { a });
 					object keyB = keyFunc.Call(this, new List<object> { b });
 					int comparison = CompareObjects(keyA, keyB);
@@ -1378,8 +1165,7 @@ namespace LoopLanguage
 			}
 			else
 			{
-				result.Sort((a, b) =>
-				{
+				result.Sort((a, b) => {
 					int comparison = CompareObjects(a, b);
 					return reverse ? -comparison : comparison;
 				});
@@ -1467,8 +1253,7 @@ namespace LoopLanguage
 			if (keyFunc != null)
 			{
 				// Sort with lambda key function
-				list.Sort((a, b) =>
-				{
+				list.Sort((a, b) => {
 					object keyA = keyFunc.Call(this, new List<object> { a });
 					object keyB = keyFunc.Call(this, new List<object> { b });
 					int comparison = CompareObjects(keyA, keyB);
@@ -1478,10 +1263,9 @@ namespace LoopLanguage
 			else if (keyFuncDef != null)
 			{
 				// Sort with user-defined key function
-				list.Sort((a, b) =>
-				{
-					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, new Dictionary<string, object>(), null);
-					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, new Dictionary<string, object>(), null);
+				list.Sort((a, b) => {
+					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, null);
+					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, null);
 					int comparison = CompareObjects(keyA, keyB);
 					return reverse ? -comparison : comparison;
 				});
@@ -1492,8 +1276,7 @@ namespace LoopLanguage
 				// Only works for simple comparable types
 				try
 				{
-					list.Sort((a, b) =>
-					{
+					list.Sort((a, b) => {
 						int comparison = CompareObjects(a, b);
 						return reverse ? -comparison : comparison;
 					});
@@ -1508,44 +1291,11 @@ namespace LoopLanguage
 			return null;
 		}
 
-
-		private object CallUserFunction(FunctionDefStmt func, List<object> arguments, Dictionary<string, object> kwargs, ClassInstance instance)
+		private object CallUserFunction(FunctionDefStmt func, List<object> arguments, ClassInstance instance)
 		{
-			// Handle null kwargs (backward compatibility)
-			if (kwargs == null)
+			if (arguments.Count != func.Parameters.Count)
 			{
-				kwargs = new Dictionary<string, object>();
-			}
-
-			// Combine positional and keyword arguments
-			List<object> finalArgs = new List<object>(arguments);
-
-			// Fill in keyword arguments by parameter name
-			for (int i = finalArgs.Count; i < func.Parameters.Count; i++)
-			{
-				string paramName = func.Parameters[i];
-				if (kwargs.ContainsKey(paramName))
-				{
-					finalArgs.Add(kwargs[paramName]);
-				}
-				else
-				{
-					throw new RuntimeError($"Missing required argument: '{paramName}'");
-				}
-			}
-
-			// Check for extra keyword arguments
-			foreach (string kwargName in kwargs.Keys)
-			{
-				if (!func.Parameters.Contains(kwargName))
-				{
-					throw new RuntimeError($"Function got unexpected keyword argument: '{kwargName}'");
-				}
-			}
-
-			if (finalArgs.Count != func.Parameters.Count)
-			{
-				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {finalArgs.Count}");
+				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {arguments.Count}");
 			}
 
 			recursionDepth++;
@@ -1563,7 +1313,7 @@ namespace LoopLanguage
 
 			for (int i = 0; i < func.Parameters.Count; i++)
 			{
-				functionScope.Define(func.Parameters[i], finalArgs[i]);
+				functionScope.Define(func.Parameters[i], arguments[i]);
 			}
 
 			Scope previousScope = currentScope;
@@ -1571,35 +1321,28 @@ namespace LoopLanguage
 
 			try
 			{
-				// ★ NEW: Check if any statement in the function is async
-				bool hasAsyncStatement = false;
-
 				for (int stmtIndex = 0; stmtIndex < func.Body.Count; stmtIndex++)
 				{
 					Stmt stmt = func.Body[stmtIndex];
-
-					// Try to execute synchronously first
 					object result = ExecuteStatementSync(stmt);
 
 					if (result is IEnumerator)
 					{
 						// Found async statement - execute entire function as coroutine
-						hasAsyncStatement = true;
 						recursionDepth--;
 						currentScope = previousScope;
-						return ExecuteFunctionBodyAsync(func, functionScope, previousScope, finalArgs, instance, stmtIndex);
+						return ExecuteFunctionBodyAsync(func, functionScope, previousScope, arguments, instance, stmtIndex);
 					}
 				}
 
-				// ★ All statements executed synchronously, function returns None
 				recursionDepth--;
-				return null;
+				return null; // ★ No explicit return, function returns None
 			}
 			catch (ReturnException e)
 			{
 				recursionDepth--;
 				currentScope = previousScope;
-				return e.Value;  // ★ Return the actual value, not wrapped
+				return e.Value;
 			}
 			finally
 			{
@@ -1616,15 +1359,41 @@ namespace LoopLanguage
 
 			IEnumerator routine = ExecuteStatement(stmt);
 
-			// ★ FIX: Don't execute routine here - just return it if it exists
-			// The calling code will execute it properly without duplication
+			// ★ FIX: Execute non-yielding statements immediately
 			if (routine != null)
 			{
-				return routine;
+				// Try to execute it - if it completes without yielding, we're done
+				bool hasMore = true;
+				while (hasMore)
+				{
+					try
+					{
+						hasMore = routine.MoveNext();
+					}
+					catch
+					{
+						throw;
+					}
+
+					// If it yielded something, return the routine for async handling
+					if (routine.Current != null)
+					{
+						return routine;
+					}
+
+					if (!hasMore) break;
+				}
+
+				// Completed without yielding
+				return null;
 			}
 
 			return null;
 		}
+		// ============================================
+		// ★ STEP 4: Modify ExecuteFunctionBodyAsync (around line 710)
+		// Replace the entire method with this version:
+		// ============================================
 
 		private IEnumerator ExecuteFunctionBodyAsync(FunctionDefStmt func, Scope functionScope, Scope previousScope, List<object> arguments, ClassInstance instance, int startIndex = 0)
 		{
@@ -1698,13 +1467,14 @@ namespace LoopLanguage
 			recursionDepth--;
 			currentScope = previousScope;
 		}
+
 		private object CreateClassInstance(Dictionary<string, FunctionDefStmt> classMethods, List<object> arguments)
 		{
 			ClassInstance instance = new ClassInstance("Class", classMethods);
 
 			if (classMethods.ContainsKey("__init__"))
 			{
-				CallUserFunction(classMethods["__init__"], arguments, new Dictionary<string, object>(), instance);
+				CallUserFunction(classMethods["__init__"], arguments, instance);
 			}
 
 			return instance;
@@ -1955,8 +1725,7 @@ namespace LoopLanguage
 				switch (expr.Member)
 				{
 					case "append":
-						return new BuiltinFunction("append", args =>
-						{
+						return new BuiltinFunction("append", args => {
 							if (args.Count != 1)
 								throw new RuntimeError("append() takes exactly 1 argument");
 							list.Add(args[0]);
@@ -1964,8 +1733,7 @@ namespace LoopLanguage
 						});
 
 					case "pop":
-						return new BuiltinFunction("pop", args =>
-						{
+						return new BuiltinFunction("pop", args => {
 							if (list.Count == 0)
 								throw new RuntimeError("pop from empty list");
 							int index = list.Count - 1;
@@ -1977,8 +1745,7 @@ namespace LoopLanguage
 						});
 
 					case "clear":
-						return new BuiltinFunction("clear", args =>
-						{
+						return new BuiltinFunction("clear", args => {
 							if (args.Count != 0)
 								throw new RuntimeError("clear() takes no arguments");
 							list.Clear();
@@ -1986,8 +1753,7 @@ namespace LoopLanguage
 						});
 
 					case "remove":
-						return new BuiltinFunction("remove", args =>
-						{
+						return new BuiltinFunction("remove", args => {
 							if (args.Count != 1)
 								throw new RuntimeError("remove() takes exactly 1 argument");
 							list.Remove(args[0]);
@@ -2011,24 +1777,21 @@ namespace LoopLanguage
 				switch (expr.Member)
 				{
 					case "keys":
-						return new BuiltinFunction("keys", args =>
-						{
+						return new BuiltinFunction("keys", args => {
 							if (args.Count != 0)
 								throw new RuntimeError("keys() takes no arguments");
 							return new List<object>(dict.Keys);
 						});
 
 					case "values":
-						return new BuiltinFunction("values", args =>
-						{
+						return new BuiltinFunction("values", args => {
 							if (args.Count != 0)
 								throw new RuntimeError("values() takes no arguments");
 							return new List<object>(dict.Values);
 						});
 
 					case "get":
-						return new BuiltinFunction("get", args =>
-						{
+						return new BuiltinFunction("get", args => {
 							if (args.Count < 1 || args.Count > 2)
 								throw new RuntimeError("get() takes 1 or 2 arguments");
 							object key = args[0];
@@ -2038,8 +1801,7 @@ namespace LoopLanguage
 						});
 
 					case "clear":
-						return new BuiltinFunction("clear", args =>
-						{
+						return new BuiltinFunction("clear", args => {
 							if (args.Count != 0)
 								throw new RuntimeError("clear() takes no arguments");
 							dict.Clear();
@@ -2126,12 +1888,7 @@ namespace LoopLanguage
 			}
 		}
 
-
-		/// <summary>
-		/// Wrapper to communicate function return values through coroutines
-		/// When a function completes, it yields this wrapper containing the return value
-		/// Calling code can check for this and extract the value
-		/// </summary>
+		// ★ NEW: Wrapper to communicate function return values through coroutines
 		private class FunctionReturn
 		{
 			public object Value;
@@ -2261,47 +2018,20 @@ namespace LoopLanguage
 			throw new RuntimeError("Object is not iterable");
 		}
 
+		// ============================================
+		// ★ STEP 3: Add CallUserFunctionSync helper method
+		// Add this new method after CallUserFunction:
+		// ============================================
+
 		/// <summary>
 		/// Synchronous version for use in callbacks (like sort key functions)
 		/// Throws error if async operations detected
 		/// </summary>
-		private object CallUserFunctionSync(FunctionDefStmt func, List<object> arguments, Dictionary<string, object> kwargs, ClassInstance instance)
+		private object CallUserFunctionSync(FunctionDefStmt func, List<object> arguments, ClassInstance instance)
 		{
-			// Handle null kwargs (backward compatibility)
-			if (kwargs == null)
+			if (arguments.Count != func.Parameters.Count)
 			{
-				kwargs = new Dictionary<string, object>();
-			}
-
-			// Combine positional and keyword arguments
-			List<object> finalArgs = new List<object>(arguments);
-
-			// Fill in keyword arguments by parameter name
-			for (int i = finalArgs.Count; i < func.Parameters.Count; i++)
-			{
-				string paramName = func.Parameters[i];
-				if (kwargs.ContainsKey(paramName))
-				{
-					finalArgs.Add(kwargs[paramName]);
-				}
-				else
-				{
-					throw new RuntimeError($"Missing required argument: '{paramName}'");
-				}
-			}
-
-			// Check for extra keyword arguments
-			foreach (string kwargName in kwargs.Keys)
-			{
-				if (!func.Parameters.Contains(kwargName))
-				{
-					throw new RuntimeError($"Function got unexpected keyword argument: '{kwargName}'");
-				}
-			}
-
-			if (finalArgs.Count != func.Parameters.Count)
-			{
-				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {finalArgs.Count}");
+				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {arguments.Count}");
 			}
 
 			recursionDepth++;
@@ -2319,7 +2049,7 @@ namespace LoopLanguage
 
 			for (int i = 0; i < func.Parameters.Count; i++)
 			{
-				functionScope.Define(func.Parameters[i], finalArgs[i]);
+				functionScope.Define(func.Parameters[i], arguments[i]);
 			}
 
 			Scope previousScope = currentScope;
@@ -2593,8 +2323,7 @@ namespace LoopLanguage
 			if (keyFunc != null)
 			{
 				// Sort with key function
-				result.Sort((a, b) =>
-				{
+				result.Sort((a, b) => {
 					object keyA = keyFunc.Call(this, new List<object> { a });
 					object keyB = keyFunc.Call(this, new List<object> { b });
 
@@ -2606,8 +2335,7 @@ namespace LoopLanguage
 			else
 			{
 				// Default sort
-				result.Sort((a, b) =>
-				{
+				result.Sort((a, b) => {
 					int comparison = CompareObjects(a, b);
 
 					return reverse ? -comparison : comparison;
