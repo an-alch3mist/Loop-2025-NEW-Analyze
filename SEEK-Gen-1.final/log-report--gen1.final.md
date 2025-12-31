@@ -159,8 +159,8 @@ False
 [TEST 23] ✓ PASSED: Recursion with factorial
 
 [TEST 24] Running: Recursion with Fibonacci
-55
-[TEST 24] ✓ PASSED: Recursion with Fibonacci
+[TEST 24] ✗ FAILED: Recursion with Fibonacci
+RUNTIME ERROR: Maximum recursion depth exceeded
 
 [TEST 25] Running: Break and continue in
 0
@@ -268,7 +268,7 @@ Before sleep
 well ets see about this
 line-0
 [TEST 38] ✗ FAILED: sleep() with integer argument
-RUNTIME ERROR: Line 4: Undefined variable: prin
+RUNTIME ERROR: Undefined variable: prin
 
 [TEST 39] Running: sleep() with float argument
 Before sleep
@@ -506,8 +506,7 @@ Moved to (2, 4)
 Moved to (3, 4)
 Moved to (4, 4)
 Scanned 25 tiles
-
-[TEST 60 ✓ PASSED: Scan entire grid (mix of instant queries and movement)
+[TEST 60] ✓ PASSED: Scan entire grid (mix of instant queries and movement)
 
 [TEST 61] Running: Instruction budget triggers (no sleep/game commands)
 Sum: 499500
@@ -546,6 +545,10 @@ Result: 45.14
 
 [TEST 67] Running: Complete farming cycle
 Planted carrot at (0, 0)
+Planted carrot
+Harvested! Hay count: 1
+Harvested carrot
+Carrots in inventory: 0
 [TEST 67] ✓ PASSED: Complete farming cycle
 
 [TEST 68] Running: Farm a grid pattern
@@ -690,8 +693,8 @@ True
 ========================================
 TEST SUITE COMPLETE
 Tests Run: 79
-Passed: 78
-Failed: 1
-Success Rate: 98.7%
+Passed: 77
+Failed: 2
+Success Rate: 97.5%
 ========================================
 

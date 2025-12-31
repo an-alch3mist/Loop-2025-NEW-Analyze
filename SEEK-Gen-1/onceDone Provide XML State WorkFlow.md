@@ -1,7 +1,7 @@
 # also once you done(only after every files generation complete) with that provide the following,
 
 # Act as a Senior Lead Developer and Prompt Engineer.
-## I am building the "LOOP Language" project (a Unity C# Python Interpreter) based on a detailed specification. The project has generated over 15 distinct C# files (Lexer.cs, Parser.cs, AST.cs, PythonInterpreter.cs, etc.), and the codebase is growing large.
+## I am building the "LOOP Language" project (a Unity C# Python Interpreter) based on a detailed specification. The project has generated over following distinct C# files (Lexer.cs, Parser.cs, AST.cs, PythonInterpreter.cs, etc.), and the codebase is growing large.
 ## I cannot upload all these files into a new chat session every time I want to add a feature because it will hit token limits or degrade reasoning quality.
 ## I need you to teach me a `Stateless Maintenance Workflow` (i heard the xml format Prompt works best for Claude 4.5 in Future) so I can work with you indefinitely on this project without re-uploading everything(sincse the all `*.cs` may surpass the 200k token upload limit ? ).
 ## Please provide the following 3 deliverables(in a single file of detailed xml format(since thats optimal for Claude 4.5)):

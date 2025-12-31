@@ -516,3 +516,46 @@ here's the error log report [pasted] from unity console(log reports) what you th
 what's the file you gotta need to modify to fix that, and provide the required solution.
 make sure it wont break any the existing features that is successfully working
 keep critical note in mind: .Net2.0 limitation cannot use `yield return null/value/anything inside try-catch block which is inside IEnumerator` .
+
+```py
+# Test: Recursion with Fibonacci
+def fib(n):
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+print(fib(12))  # Expected: 144 = result
+print(fib(12))  # Expected: 144 = result
+print(fib(12))  # Expected: 144 = error(<color=red>[RUNTIME ERROR] Maximum recursion depth exceeded</color>)
+
+```
+`even though max_depth = 1000`
+got error for 3rd call fib,
+the thing about max_depth decurssion is per call, i mean say fib(12) called at begining exeed that limit 
+the limit reset when the fib called fresly again isnt that how the real recursion in pythoon 3 works ? do indepth research and set limit to 100-500 depth level for now.
+from my understanding i think depth as the tree depth level formed by recursion 100 depth level is 100th child no ?
+
+btw tryna build a `farmer was replaced` clone for educational purpose
+here's the error log report [pasted] from unity console(log reports) what you think is the issue ? provide the fix and let me know.
+what's the file you gotta need to modify to fix that, and provide the required solution.
+make sure it wont break any the existing features that is successfully working
+little note: keep in mind critical note in mind: .Net2.0 limitation cannot use `yield return null/value/anything inside try-catch block which is inside IEnumerator` .
+provide minimal fix required for the `*.cs` file or function in it where i should modify
+
+
+```py (it works now)
+
+list = []
+def recursive(depth):
+    print(depth)
+    walk(1, 0)
+    list.append(depth)
+    if(depth > 3):
+        return
+    recursive(depth + 1)
+    recursive(depth + 1)
+
+recursive(0)
+print(list)
+
+```

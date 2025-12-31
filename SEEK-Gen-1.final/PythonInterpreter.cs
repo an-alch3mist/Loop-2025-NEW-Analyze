@@ -24,7 +24,7 @@ namespace LoopLanguage
 		private GameBuiltinMethods gameBuiltins;
 		private HashSet<string> globalVariables;
 		private int recursionDepth;
-		private const int MAX_RECURSION_DEPTH = 100;
+		private const int MAX_RECURSION_DEPTH = 30;
 		private ConsoleManager console;  // ← ADD THIS
 
 		// Control flow flags for .NET 2.0 compatibility
@@ -1583,11 +1583,13 @@ namespace LoopLanguage
 
 					if (result is IEnumerator)
 					{
-						// Found async statement - execute entire function as coroutine
+						// Found async statement - switch to async execution
+						// ★ CRITICAL FIX: Pass the existing routine AND start from NEXT statement
+						// to avoid re-executing the statement that triggered async mode
 						hasAsyncStatement = true;
 						recursionDepth--;
 						currentScope = previousScope;
-						return ExecuteFunctionBodyAsync(func, functionScope, previousScope, finalArgs, instance, stmtIndex);
+						return ExecuteFunctionBodyAsync(func, functionScope, previousScope, finalArgs, instance, stmtIndex + 1, (IEnumerator)result);
 					}
 				}
 
@@ -1608,12 +1610,8 @@ namespace LoopLanguage
 		}
 		private object ExecuteStatementSync(Stmt stmt)
 		{
-			if (stmt is ReturnStmt)
-			{
-				ExecuteReturn((ReturnStmt)stmt);
-				return null;
-			}
-
+			// ★ FIX: Don't special-case return statements
+			// Let them go through normal IEnumerator path so async mode handles them properly
 			IEnumerator routine = ExecuteStatement(stmt);
 
 			// ★ FIX: Don't execute routine here - just return it if it exists
@@ -1626,13 +1624,58 @@ namespace LoopLanguage
 			return null;
 		}
 
-		private IEnumerator ExecuteFunctionBodyAsync(FunctionDefStmt func, Scope functionScope, Scope previousScope, List<object> arguments, ClassInstance instance, int startIndex = 0)
+		private IEnumerator ExecuteFunctionBodyAsync(FunctionDefStmt func, Scope functionScope, Scope previousScope, List<object> arguments, ClassInstance instance, int startIndex = 0, IEnumerator existingRoutine = null)
 		{
 			currentScope = functionScope;
 			recursionDepth++;
 
 			object returnValue = null; // ★ Track return value
 			bool hasReturned = false;
+
+			// ★ CRITICAL FIX: Execute the existing routine from sync mode first
+			// This ensures the statement that triggered async mode executes exactly once
+			if (existingRoutine != null)
+			{
+				// ★ FIX: Save currentScope before executing existingRoutine
+				// The recursive call will modify currentScope, so we need to restore it
+				Scope scopeBeforeExistingRoutine = currentScope;
+
+				while (true)
+				{
+					bool hasMore = false;
+					bool returnCaught = false;
+
+					try
+					{
+						hasMore = existingRoutine.MoveNext();
+					}
+					catch (ReturnException e)
+					{
+						returnValue = e.Value;
+						hasReturned = true;
+						returnCaught = true;
+					}
+
+					if (returnCaught)
+					{
+						// ★ CRITICAL FIX: Decrement BEFORE yielding FunctionReturn
+						// Parent stops calling MoveNext after getting FunctionReturn,
+						// so code after yield never executes!
+						recursionDepth--;
+						currentScope = previousScope;
+						yield return new FunctionReturn(returnValue);
+						yield break;
+					}
+
+					if (!hasMore) break;
+
+					yield return existingRoutine.Current;
+				}
+
+				// ★ FIX: Restore currentScope after executing existingRoutine
+				// This ensures remaining statements execute with correct variable bindings
+				currentScope = scopeBeforeExistingRoutine;
+			}
 
 			for (int stmtIndex = startIndex; stmtIndex < func.Body.Count; stmtIndex++)
 			{
@@ -1658,6 +1701,10 @@ namespace LoopLanguage
 
 				if (routine != null)
 				{
+					// ★ FIX: Save currentScope before executing statement routine
+					// Recursive calls will modify currentScope, so we need to restore it
+					Scope scopeBeforeStatement = currentScope;
+
 					while (true)
 					{
 						bool hasMore = false;
@@ -1684,6 +1731,9 @@ namespace LoopLanguage
 						yield return routine.Current;
 					}
 
+					// ★ FIX: Restore currentScope after executing statement routine
+					currentScope = scopeBeforeStatement;
+
 					if (hasReturned)
 					{
 						break;
@@ -1691,12 +1741,15 @@ namespace LoopLanguage
 				}
 			}
 
-			// ★ CRITICAL FIX: Yield the return value wrapped in FunctionReturn
-			// This allows calling code to extract it
-			yield return new FunctionReturn(returnValue);
-
+			// ★ CRITICAL FIX: Decrement BEFORE yielding FunctionReturn
+			// Parent stops calling MoveNext after getting FunctionReturn,
+			// so code after yield never executes!
 			recursionDepth--;
 			currentScope = previousScope;
+
+			// Yield the return value wrapped in FunctionReturn
+			// This allows calling code to extract it
+			yield return new FunctionReturn(returnValue);
 		}
 		private object CreateClassInstance(Dictionary<string, FunctionDefStmt> classMethods, List<object> arguments)
 		{
