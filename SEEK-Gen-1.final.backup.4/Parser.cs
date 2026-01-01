@@ -373,7 +373,7 @@ namespace LoopLanguage
 				// Lambda body can be any expression (including list comprehension)
 				Expr body = Conditional();
 
-				return Postfix(new LambdaExpr(parameters, body));
+				return new LambdaExpr(parameters, body);
 			}
 
 			return Conditional();
@@ -601,8 +601,7 @@ namespace LoopLanguage
 
 			if (Match(TokenType.STRING))
 			{
-				// return new LiteralExpr(Previous().Literal);
-				return Postfix(new LiteralExpr(Previous().Literal));  // ← Has Postfix!
+				return new LiteralExpr(Previous().Literal);
 			}
 
 			if (Match(TokenType.IDENTIFIER))
@@ -666,7 +665,7 @@ namespace LoopLanguage
 
 				if (Match(TokenType.RIGHT_BRACKET))
 				{
-					return Postfix(new ListExpr(new List<Expr>()));
+					return new ListExpr(new List<Expr>());
 				}
 
 				Expr first = Expression();
@@ -692,7 +691,7 @@ namespace LoopLanguage
 					while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 					Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list comprehension");
-					return Postfix(new ListCompExpr(first, variable.Lexeme, iterable, condition));
+					return new ListCompExpr(first, variable.Lexeme, iterable, condition);
 				}
 
 				// Regular list
@@ -716,7 +715,7 @@ namespace LoopLanguage
 				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 				Consume(TokenType.RIGHT_BRACKET, "Expected ']' after list");
-				return Postfix(new ListExpr(elements));
+				return new ListExpr(elements);
 			}
 
 			if (Match(TokenType.LEFT_BRACE))
@@ -729,7 +728,7 @@ namespace LoopLanguage
 				if (Match(TokenType.RIGHT_BRACE))
 				{
 					// Empty dictionary
-					return Postfix(new DictExpr(new List<Expr>(), new List<Expr>()));
+					return new DictExpr(new List<Expr>(), new List<Expr>());
 				}
 
 				List<Expr> keys = new List<Expr>();
@@ -786,7 +785,7 @@ namespace LoopLanguage
 				while (Match(TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT)) { }
 
 				Consume(TokenType.RIGHT_BRACE, "Expected '}' after dictionary");
-				return Postfix(new DictExpr(keys, values));
+				return new DictExpr(keys, values);
 			}
 
 			throw new ParserError($"Unexpected token: {Peek().Lexeme}");

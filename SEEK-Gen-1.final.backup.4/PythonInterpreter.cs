@@ -24,17 +24,13 @@ namespace LoopLanguage
 		private GameBuiltinMethods gameBuiltins;
 		private HashSet<string> globalVariables;
 		private int recursionDepth;
-		private const int MAX_RECURSION_DEPTH = 100;
-		private int recursionNodeCount;  // ★ NEW: Total nodes in current recursion tree
-		private const int MAX_RECURSION_NODES = 16384;  // ★ NEW: Max total calls (2^14)
+		private const int MAX_RECURSION_DEPTH = 30;
 		private ConsoleManager console;  // ← ADD THIS
 
 		// Control flow flags for .NET 2.0 compatibility
 		private bool breakFlag = false;
 		private bool continueFlag = false;
 
-		// Cache for type objects (prevents shadowing by user variables)
-		private Dictionary<string, TypeObject> typeCache;
 		#endregion
 
 		#region Constructor
@@ -47,6 +43,7 @@ namespace LoopLanguage
 		#endregion
 
 		#region Public Methods
+
 		public void Reset()
 		{
 			globalScope = new Scope();
@@ -55,22 +52,8 @@ namespace LoopLanguage
 			currentLineNumber = 1;
 			globalVariables = new HashSet<string>();
 			recursionDepth = 0;
-			recursionNodeCount = 0;
 			breakFlag = false;
 			continueFlag = false;
-
-			// ✅ Initialize type cache with simplified types
-			typeCache = new Dictionary<string, TypeObject>();
-			typeCache["number"] = new TypeObject("number");      // ★ CHANGED: Unified numeric type
-			typeCache["str"] = new TypeObject("str");
-			typeCache["bool"] = new TypeObject("bool");
-			typeCache["list"] = new TypeObject("list");
-			typeCache["dict"] = new TypeObject("dict");
-			typeCache["tuple"] = new TypeObject("tuple");
-			typeCache["NoneType"] = new TypeObject("NoneType");
-			typeCache["function"] = new TypeObject("function");
-			typeCache["object"] = new TypeObject("object");
-			typeCache["builtin_function_or_method"] = new TypeObject("builtin_function_or_method");
 
 			RegisterBuiltins();
 			RegisterEnums();
@@ -115,7 +98,6 @@ namespace LoopLanguage
 			globalScope.Define("max", new BuiltinFunction("max", Max));
 			globalScope.Define("sum", new BuiltinFunction("sum", Sum));
 			globalScope.Define("sorted", new BuiltinFunction("sorted", Sorted));
-			globalScope.Define("type", new BuiltinFunction("type", TypeDef));
 
 			globalScope.Define("move", new BuiltinFunction("move", gameBuiltins.Move));
 			globalScope.Define("walk", new BuiltinFunction("walk", gameBuiltins.Walk));
@@ -150,9 +132,6 @@ namespace LoopLanguage
 			globalScope.Define("South", "down");
 			globalScope.Define("East", "right");
 			globalScope.Define("West", "left");
-
-			// Type objects NOT registered here - they're BuiltinFunctions
-			// Type comparisons work via enhanced AreEqual() method
 		}
 
 		#endregion
@@ -1029,50 +1008,6 @@ namespace LoopLanguage
 				return IsTruthy(leftValue) || IsTruthy(rightValue);
 			}
 
-			// ★ NEW: Handle string multiplication (Python-style: "abc" * 3 or 3 * "abc")
-			if (op == TokenType.STAR)
-			{
-				// Check for string * number
-				if (leftValue is string && (rightValue is double || rightValue is int))
-				{
-					string str = (string)leftValue;
-					int count = NumberHandling.ToInteger(rightValue, "String multiplication");
-
-					if (count < 0)
-					{
-						throw new RuntimeError("String multiplication count cannot be negative");
-					}
-
-					// Build repeated string
-					System.Text.StringBuilder result = new System.Text.StringBuilder(str.Length * count);
-					for (int i = 0; i < count; i++)
-					{
-						result.Append(str);
-					}
-					return result.ToString();
-				}
-
-				// Check for number * string
-				if ((leftValue is double || leftValue is int) && rightValue is string)
-				{
-					int count = NumberHandling.ToInteger(leftValue, "String multiplication");
-					string str = (string)rightValue;
-
-					if (count < 0)
-					{
-						throw new RuntimeError("String multiplication count cannot be negative");
-					}
-
-					// Build repeated string
-					System.Text.StringBuilder result = new System.Text.StringBuilder(str.Length * count);
-					for (int i = 0; i < count; i++)
-					{
-						result.Append(str);
-					}
-					return result.ToString();
-				}
-			}
-
 			// From here on, we need numeric values
 			// Convert to numbers for arithmetic and numeric comparisons
 			double leftNum = ToNumber(leftValue);
@@ -1463,7 +1398,6 @@ namespace LoopLanguage
 		/// Executes list.sort() with optional key function and reverse flag
 		/// Supports: list.sort(), list.sort(key=func), list.sort(key=func, reverse=True)
 		/// Python style: sorts in place, returns None
-		/// PRE-COMPUTES keys before sorting to avoid issues with async/exceptions in comparison
 		/// </summary>
 		private object ExecuteListSort(List<object> list, List<object> positionalArgs, Dictionary<string, object> kwargs)
 		{
@@ -1472,6 +1406,7 @@ namespace LoopLanguage
 			bool reverse = false;
 
 			// Handle positional arguments (for backward compatibility)
+			// list.sort(lambda x: x) or list.sort(myFunc)
 			if (positionalArgs.Count >= 1)
 			{
 				if (positionalArgs[0] is LambdaFunction)
@@ -1489,7 +1424,8 @@ namespace LoopLanguage
 				reverse = IsTruthy(positionalArgs[1]);
 			}
 
-			// Handle keyword arguments
+			// Handle keyword arguments (Python style)
+			// list.sort(key=lambda x: x, reverse=True)
 			if (kwargs.ContainsKey("key"))
 			{
 				object keyValue = kwargs["key"];
@@ -1518,6 +1454,7 @@ namespace LoopLanguage
 				throw new RuntimeError("sort() takes at most 2 positional arguments");
 			}
 
+			// Validate that we only have known keyword arguments
 			foreach (string key in kwargs.Keys)
 			{
 				if (key != "key" && key != "reverse")
@@ -1526,128 +1463,33 @@ namespace LoopLanguage
 				}
 			}
 
-			// ★ NEW APPROACH: Pre-compute all keys before sorting (Python's internal approach)
-			// This prevents issues with async operations and gives better error handling
+			// Perform the sort
 			if (keyFunc != null)
 			{
-				// Pre-compute all key values
-				List<object> keys = new List<object>(list.Count);
-
-				for (int i = 0; i < list.Count; i++)
+				// Sort with lambda key function
+				list.Sort((a, b) =>
 				{
-					try
-					{
-						object keyValue = keyFunc.Call(this, new List<object> { list[i] });
-
-						// Check if key function is trying to do async operations
-						if (keyValue is IEnumerator)
-						{
-							throw new RuntimeError("Cannot use sleep() or async operations inside sort key function. Key functions must be synchronous.");
-						}
-
-						keys.Add(keyValue);
-					}
-					catch (RuntimeError)
-					{
-						throw; // Re-throw our own errors
-					}
-					catch (Exception e)
-					{
-						throw new RuntimeError($"Error in sort key function for element {i}: {e.Message}");
-					}
-				}
-
-				// Create index array for indirect sorting
-				List<int> indices = new List<int>(list.Count);
-				for (int i = 0; i < list.Count; i++)
-				{
-					indices.Add(i);
-				}
-
-				// Sort indices based on pre-computed keys
-				try
-				{
-					indices.Sort((idxA, idxB) =>
-					{
-						int comparison = CompareObjects(keys[idxA], keys[idxB]);
-						return reverse ? -comparison : comparison;
-					});
-				}
-				catch (Exception e)
-				{
-					throw new RuntimeError($"Error comparing sort keys: {e.Message}");
-				}
-
-				// Reorder list based on sorted indices
-				List<object> sortedList = new List<object>(list.Count);
-				for (int i = 0; i < indices.Count; i++)
-				{
-					sortedList.Add(list[indices[i]]);
-				}
-
-				// Update original list in place
-				list.Clear();
-				list.AddRange(sortedList);
+					object keyA = keyFunc.Call(this, new List<object> { a });
+					object keyB = keyFunc.Call(this, new List<object> { b });
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
 			}
 			else if (keyFuncDef != null)
 			{
-				// Similar approach for user-defined functions
-				List<object> keys = new List<object>(list.Count);
-
-				for (int i = 0; i < list.Count; i++)
+				// Sort with user-defined key function
+				list.Sort((a, b) =>
 				{
-					try
-					{
-						object keyValue = CallUserFunctionSync(keyFuncDef, new List<object> { list[i] }, new Dictionary<string, object>(), null);
-
-						if (keyValue is IEnumerator)
-						{
-							throw new RuntimeError("Cannot use sleep() or async operations inside sort key function. Key functions must be synchronous.");
-						}
-
-						keys.Add(keyValue);
-					}
-					catch (RuntimeError)
-					{
-						throw;
-					}
-					catch (Exception e)
-					{
-						throw new RuntimeError($"Error in sort key function for element {i}: {e.Message}");
-					}
-				}
-
-				List<int> indices = new List<int>(list.Count);
-				for (int i = 0; i < list.Count; i++)
-				{
-					indices.Add(i);
-				}
-
-				try
-				{
-					indices.Sort((idxA, idxB) =>
-					{
-						int comparison = CompareObjects(keys[idxA], keys[idxB]);
-						return reverse ? -comparison : comparison;
-					});
-				}
-				catch (Exception e)
-				{
-					throw new RuntimeError($"Error comparing sort keys: {e.Message}");
-				}
-
-				List<object> sortedList = new List<object>(list.Count);
-				for (int i = 0; i < indices.Count; i++)
-				{
-					sortedList.Add(list[indices[i]]);
-				}
-
-				list.Clear();
-				list.AddRange(sortedList);
+					object keyA = CallUserFunction(keyFuncDef, new List<object> { a }, new Dictionary<string, object>(), null);
+					object keyB = CallUserFunction(keyFuncDef, new List<object> { b }, new Dictionary<string, object>(), null);
+					int comparison = CompareObjects(keyA, keyB);
+					return reverse ? -comparison : comparison;
+				});
 			}
 			else
 			{
 				// Default sort (no key function)
+				// Only works for simple comparable types
 				try
 				{
 					list.Sort((a, b) =>
@@ -1658,7 +1500,7 @@ namespace LoopLanguage
 				}
 				catch (Exception e)
 				{
-					throw new RuntimeError($"Cannot sort items: {e.Message}. Items must be comparable.");
+					throw new RuntimeError($"sort() cannot compare items: {e.Message}");
 				}
 			}
 
@@ -1706,23 +1548,10 @@ namespace LoopLanguage
 				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {finalArgs.Count}");
 			}
 
-			// ★ NEW: Reset node count if this is a top-level call
-			if (recursionDepth == 0)
-			{
-				recursionNodeCount = 0;
-			}
-
 			recursionDepth++;
 			if (recursionDepth > MAX_RECURSION_DEPTH)
 			{
-				throw new RuntimeError($"Maximum recursion depth exceeded (limit: {MAX_RECURSION_DEPTH} levels)");
-			}
-
-			// ★ NEW: Track total nodes in recursion tree
-			recursionNodeCount++;
-			if (recursionNodeCount > MAX_RECURSION_NODES)
-			{
-				throw new RuntimeError($"Maximum recursion nodes exceeded (limit: {MAX_RECURSION_NODES} total calls, depth: {recursionDepth})");
+				throw new RuntimeError("Maximum recursion depth exceeded");
 			}
 
 			Scope functionScope = new Scope(currentScope);
@@ -2275,260 +2104,6 @@ namespace LoopLanguage
 				}
 			}
 
-			// ★ NEW: String method access
-			if (obj is string)
-			{
-				string str = (string)obj;
-
-				switch (expr.Member)
-				{
-					case "upper":
-						return new BuiltinFunction("upper", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("upper() takes no arguments");
-							return str.ToUpper();
-						});
-
-					case "lower":
-						return new BuiltinFunction("lower", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("lower() takes no arguments");
-							return str.ToLower();
-						});
-
-					case "strip":
-						return new BuiltinFunction("strip", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("strip() takes no arguments");
-							return str.Trim();
-						});
-
-					case "trim":  // Alias for strip (for compatibility)
-						return new BuiltinFunction("trim", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("trim() takes no arguments");
-							return str.Trim();
-						});
-
-					case "split":
-						return new BuiltinFunction("split", args =>
-						{
-							if (args.Count > 1)
-								throw new RuntimeError("split() takes at most 1 argument");
-
-							if (args.Count == 0)
-							{
-								// Split on whitespace
-								string[] parts = str.Split(new char[] { ' ', '\t', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries);
-								List<object> result = new List<object>();
-								foreach (string part in parts)
-								{
-									result.Add(part);
-								}
-								return result;
-							}
-							else
-							{
-								// Split on separator
-								string sep = ToString(args[0]);
-								string[] parts = str.Split(new string[] { sep }, System.StringSplitOptions.None);
-								List<object> result = new List<object>();
-								foreach (string part in parts)
-								{
-									result.Add(part);
-								}
-								return result;
-							}
-						});
-
-					case "join":
-						return new BuiltinFunction("join", args =>
-						{
-							if (args.Count != 1)
-								throw new RuntimeError("join() takes exactly 1 argument");
-
-							List<object> items = ToList(args[0]);
-							System.Text.StringBuilder result = new System.Text.StringBuilder();
-
-							for (int i = 0; i < items.Count; i++)
-							{
-								if (i > 0)
-								{
-									result.Append(str);
-								}
-								result.Append(ToString(items[i]));
-							}
-
-							return result.ToString();
-						});
-
-					case "replace":
-						return new BuiltinFunction("replace", args =>
-						{
-							if (args.Count != 2)
-								throw new RuntimeError("replace() takes exactly 2 arguments");
-
-							string oldStr = ToString(args[0]);
-							string newStr = ToString(args[1]);
-							return str.Replace(oldStr, newStr);
-						});
-
-					case "startswith":
-						return new BuiltinFunction("startswith", args =>
-						{
-							if (args.Count != 1)
-								throw new RuntimeError("startswith() takes exactly 1 argument");
-
-							string prefix = ToString(args[0]);
-							return str.StartsWith(prefix);
-						});
-
-					case "endswith":
-						return new BuiltinFunction("endswith", args =>
-						{
-							if (args.Count != 1)
-								throw new RuntimeError("endswith() takes exactly 1 argument");
-
-							string suffix = ToString(args[0]);
-							return str.EndsWith(suffix);
-						});
-
-					case "find":
-						return new BuiltinFunction("find", args =>
-						{
-							if (args.Count != 1)
-								throw new RuntimeError("find() takes exactly 1 argument");
-
-							string search = ToString(args[0]);
-							int index = str.IndexOf(search);
-							return (double)index;  // Returns -1 if not found
-						});
-
-					case "count":
-						return new BuiltinFunction("count", args =>
-						{
-							if (args.Count != 1)
-								throw new RuntimeError("count() takes exactly 1 argument");
-
-							string search = ToString(args[0]);
-							int count = 0;
-							int index = 0;
-
-							while ((index = str.IndexOf(search, index)) != -1)
-							{
-								count++;
-								index += search.Length;
-							}
-
-							return (double)count;
-						});
-
-					case "capitalize":
-						return new BuiltinFunction("capitalize", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("capitalize() takes no arguments");
-
-							if (str.Length == 0)
-								return str;
-
-							return char.ToUpper(str[0]) + str.Substring(1).ToLower();
-						});
-
-					case "title":
-						return new BuiltinFunction("title", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("title() takes no arguments");
-
-							if (str.Length == 0)
-								return str;
-
-							System.Text.StringBuilder result = new System.Text.StringBuilder();
-							bool capitalizeNext = true;
-
-							for (int i = 0; i < str.Length; i++)
-							{
-								char c = str[i];
-								if (char.IsWhiteSpace(c))
-								{
-									result.Append(c);
-									capitalizeNext = true;
-								}
-								else if (capitalizeNext)
-								{
-									result.Append(char.ToUpper(c));
-									capitalizeNext = false;
-								}
-								else
-								{
-									result.Append(char.ToLower(c));
-								}
-							}
-
-							return result.ToString();
-						});
-
-					case "isdigit":
-						return new BuiltinFunction("isdigit", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("isdigit() takes no arguments");
-
-							if (str.Length == 0)
-								return false;
-
-							foreach (char c in str)
-							{
-								if (!char.IsDigit(c))
-									return false;
-							}
-							return true;
-						});
-
-					case "isalpha":
-						return new BuiltinFunction("isalpha", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("isalpha() takes no arguments");
-
-							if (str.Length == 0)
-								return false;
-
-							foreach (char c in str)
-							{
-								if (!char.IsLetter(c))
-									return false;
-							}
-							return true;
-						});
-
-					case "isalnum":
-						return new BuiltinFunction("isalnum", args =>
-						{
-							if (args.Count != 0)
-								throw new RuntimeError("isalnum() takes no arguments");
-
-							if (str.Length == 0)
-								return false;
-
-							foreach (char c in str)
-							{
-								if (!char.IsLetterOrDigit(c))
-									return false;
-							}
-							return true;
-						});
-
-					default:
-						throw new RuntimeError($"String has no method '{expr.Member}'");
-				}
-			}
-
 			// Class instance member access
 			if (obj is ClassInstance)
 			{
@@ -2615,52 +2190,6 @@ namespace LoopLanguage
 			public object Value;
 			public FunctionReturn(object value) { Value = value; }
 		}
-
-
-		/// <summary>
-		/// Represents a Python type object (like int, str, list, etc.)
-		/// Used for type comparisons: type(x) == "<class 'number'>", type(y) == "<class 'str'>"
-		/// </summary>
-		private class TypeObject
-		{
-			public string Name;
-
-			public TypeObject(string name)
-			{
-				Name = name;
-			}
-
-			public override string ToString()
-			{
-				// ★ CHANGED: Return Python-style string representation
-				return $"<class '{Name}'>";
-			}
-
-			// Override Equals for == comparison
-			public override bool Equals(object obj)
-			{
-				if (obj is TypeObject)
-				{
-					return Name == ((TypeObject)obj).Name;
-				}
-				// ★ CHANGED: Also compare against string literals
-				if (obj is string)
-				{
-					string str = (string)obj;
-					// Handle both formats: "number" and "<class 'number'>"
-					if (str == Name)
-						return true;
-					if (str == $"<class '{Name}'>")
-						return true;
-				}
-				return false;
-			}
-
-			public override int GetHashCode()
-			{
-				return Name.GetHashCode();
-			}
-		}
 		#endregion
 
 		#region Helper Methods
@@ -2689,7 +2218,6 @@ namespace LoopLanguage
 			if (a == null && b == null) return true;
 			if (a == null || b == null) return false;
 
-			// Handle numeric equality (1 == 1.0)
 			if (a is double || b is double)
 			{
 				return NumberHandling.NumbersEqual(a, b);
@@ -2829,23 +2357,10 @@ namespace LoopLanguage
 				throw new RuntimeError($"Function expects {func.Parameters.Count} arguments, got {finalArgs.Count}");
 			}
 
-			// ★ NEW: Reset node count if this is a top-level call
-			if (recursionDepth == 0)
-			{
-				recursionNodeCount = 0;
-			}
-
 			recursionDepth++;
 			if (recursionDepth > MAX_RECURSION_DEPTH)
 			{
-				throw new RuntimeError($"Maximum recursion depth exceeded (limit: {MAX_RECURSION_DEPTH} levels)");
-			}
-
-			// ★ NEW: Track total nodes in recursion tree
-			recursionNodeCount++;
-			if (recursionNodeCount > MAX_RECURSION_NODES)
-			{
-				throw new RuntimeError($"Maximum recursion nodes exceeded (limit: {MAX_RECURSION_NODES} total calls, depth: {recursionDepth})");
+				throw new RuntimeError("Maximum recursion depth exceeded");
 			}
 
 			Scope functionScope = new Scope(currentScope);
@@ -3224,60 +2739,6 @@ namespace LoopLanguage
 			}
 		}
 
-		/// <summary>
-		/// Returns the type of a value as a TypeObject with string representation
-		/// Numbers (int/float/double) all return "number" type
-		/// Usage: type(x) == "<class 'number'>", type(x) == "<class 'str'>"
-		/// </summary>
-		private object TypeDef(List<object> args)
-		{
-			if (args.Count != 1)
-			{
-				throw new RuntimeError("type() expects 1 argument");
-			}
-
-			object value = args[0];
-
-			// ✅ Use typeCache to get TypeObject (still needed internally)
-			if (value == null)
-				return typeCache["NoneType"];
-
-			if (value is bool)
-				return typeCache["bool"];
-
-			// ★ CHANGED: All numbers return "number" type
-			if (value is double || value is int || value is float)
-			{
-				return typeCache["number"];
-			}
-
-			if (value is string)
-				return typeCache["str"];
-
-			if (value is List<object>)
-				return typeCache["list"];
-
-			if (value is Dictionary<object, object>)
-				return typeCache["dict"];
-
-			if (value is LambdaFunction || value is FunctionDefStmt)
-				return typeCache["function"];
-
-			if (value is ClassInstance)
-				return typeCache["object"];
-
-			if (value is BuiltinFunction)
-				return typeCache["builtin_function_or_method"];
-
-			// Enum types
-			if (value is Type)
-			{
-				Type t = (Type)value;
-				return new TypeObject($"enum.{t.Name}");
-			}
-
-			return new TypeObject(value.GetType().Name);
-		}
 		#endregion
 	}
 }
